@@ -17,8 +17,8 @@ def est_zeta(n_treat, n_post_term, Y_pre_c):
 def est_omega(l2_loss, Y_pre_c, Y_pre_t, zeta):
 
     Y_pre_t = Y_pre_t.copy()
-    n_features = Y_pre_t.shape[1]
-    nrow = Y_pre_t.shape[0]
+    n_features = Y_pre_c.shape[1]
+    nrow = Y_pre_c.shape[0]
 
     _w = np.repeat(1 / n_features, n_features)
     _w0 = 1
