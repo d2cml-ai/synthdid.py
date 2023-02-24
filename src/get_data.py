@@ -1,12 +1,16 @@
 import pandas as pd
+import os
+
+_path = os.path.join(os.path.dirname(__file__), '../data/MLAB_data.txt')
 
 def fetch_CaliforniaSmoking() -> pd.DataFrame:
     """
     This data is from https://web.stanford.edu/~jhain/synthpage.html
-    [Retun]
+    [Return]
     pd.DataFrame
     """
-    _raw = pd.read_csv("../data/MLAB_data.txt", sep="\t", header=None)
+    
+    _raw = pd.read_csv(_path, sep="\t", header=None)
 
     _raw.columns = [
         "Alabama",
