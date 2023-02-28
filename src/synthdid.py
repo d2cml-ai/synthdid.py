@@ -35,6 +35,9 @@ def sdid_trajectory(hat_omega, hat_lambda, Y_pre_c, Y_post_c):
 
     return Y_c.dot(hat_omega) + _intercept
 
+def sc_potentical_outcome(Y_pre_c, Y_post_c, hat_omega_ADH):
+    return pd.concat([Y_pre_c, Y_post_c]).dot(hat_omega_ADH)
+
 def synthdid_estimate(
     df, 
     pre_term, 
@@ -63,7 +66,7 @@ def synthdid_estimate(
 
     return actual_post_treat - counterfactual_post_treat
 
-def estimated_params(df, pre_term, post_term, treatment):
+def sdid_params(df, pre_term, post_term, treatment):
 
     Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
     n_treat = len(treatment)
@@ -74,3 +77,52 @@ def estimated_params(df, pre_term, post_term, treatment):
     hat_lambda = solver.est_lambda(solver.l2_loss, Y_pre_c, Y_post_c)
 
     return {"zeta": zeta, "hat_omega": hat_omega, "hat_lambda": hat_lambda}
+
+def sc_estimate(
+        df, 
+        pre_term, 
+        post_term, 
+        treatment, 
+        additional_X = pd.DataFrame(), 
+        additional_y = pd.DataFrame()
+):
+
+    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+
+    result = pd.DataFrame({"actual_y": target_y(df, pre_term, post_term, treatment)})
+    actual_post_treat = result.loc[post_term[0]: , "actual_y"].mean()
+
+    hat_omega_ADH = solver.est_omega_ADH(
+        Y_pre_c, 
+        Y_pre_t, 
+        additional_X = additional_X,
+        additional_y = additional_y
+    )
+        
+    result["sc"] = sc_potentical_outcome(Y_pre_c, Y_post_c, hat_omega_ADH)
+    post_sc = result.loc[post_term[0]:, "sc"].mean()
+    counterfactual_post_treat = post_sc
+
+    return actual_post_treat - counterfactual_post_treat
+
+def sc_params(df, pre_term, post_term, treatment, additional_X = pd.DataFrame(), additional_y = pd.DataFrame()):
+
+    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+
+    hat_omega_ADH = solver.est_omega_ADH(
+        Y_pre_c, 
+        Y_pre_t, 
+        additional_X = additional_X,
+        additional_y = additional_y
+    )
+
+    return {"hat_omega": hat_omega_ADH}
+
+def did_estimate(df, pre_term, post_term, treatment):
+
+    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+
+    actual_post_treat = Y_post_t.mean(axis=1).mean() - Y_pre_t.mean(axis=1).mean()
+    counterfactual_post_treat = Y_post_c.mean(axis=1).mean() - Y_pre_c.mean(axis=1).mean()
+
+    return actual_post_treat - counterfactual_post_treat
