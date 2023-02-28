@@ -193,7 +193,7 @@ def est_omega_ADH(
 
     if len(additional_X) == 0:
         caled_w = fmin_slsqp(
-            partial(rmse_loss, X = Y_pre_c, y = Y_pre_t, intersept=False),
+            partial(rmse_loss, X = Y_pre_c, y = Y_pre_t, intercept=False),
             _w,
             f_eqcons=lambda x: np.sum(x) - 1,
             bounds=w_bnds,
