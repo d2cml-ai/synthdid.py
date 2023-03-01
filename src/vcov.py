@@ -5,20 +5,20 @@ from solver import *
 from  synthdid import *
 
 def vcov(object, method = "placebo", replications = 200):
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = sdid["Y_pre_c"], sdid["Y_pre_t"], sdid["Y_post_c"], sdid["Y_post_t"]
-    pre_term, post_term = sdid["pre_term"], sdid["post_term"]
+    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = object["Y_pre_c"], object["Y_pre_t"], object["Y_post_c"], object["Y_post_t"]
+    pre_term, post_term = object["pre_term"], object["post_term"]
 
     if method == "placebo":
 
-        assert sdid["n_treat"] < Y_pre_c.shape[1]
+        assert object["n_treat"] < Y_pre_c.shape[1]
         control_names = Y_pre_c.columns
 
-        result_tau_sdid = []
+        result_tau_object = []
 
         for i in tqdm(range(replications)):
             # setup
             np.random.seed(seed=0 + i)
-            placebo_t = np.random.choice(control_names, sdid["n_treat"], replace=False)
+            placebo_t = np.random.choice(control_names, object["n_treat"], replace=False)
             placebo_c = [col for col in control_names if col not in placebo_t]
             pla_Y_pre_t = Y_pre_c[placebo_t]
             pla_Y_post_t = Y_post_c[placebo_t]
@@ -39,7 +39,7 @@ def vcov(object, method = "placebo", replications = 200):
 
             # estimation
             ## sdid
-            pla_zeta = est_zeta(sdid["n_treat"], sdid["n_post_term"], pla_Y_pre_c)
+            pla_zeta = est_zeta(object["n_treat"], object["n_post_term"], pla_Y_pre_c)
 
             pla_hat_omega = est_omega(l2_loss, pla_Y_pre_c, pla_Y_pre_t, pla_zeta)
             pla_hat_lambda = est_lambda(l2_loss, pla_Y_pre_c, pla_Y_post_c)
@@ -53,20 +53,20 @@ def vcov(object, method = "placebo", replications = 200):
 
             _intercept = (start_w - pla_hat_omega) @ pla_Y_pre_c.T @ pla_hat_lambda
 
-            pla_result["sdid"] = pla_Y_c.dot(pla_hat_omega) + _intercept
+            pla_result["object"] = pla_Y_c.dot(pla_hat_omega) + _intercept
 
             # cal tau
             ## sdid
-            pre_sdid = pla_result["sdid"].head(len(pla_hat_lambda)) @ pla_hat_lambda
-            post_sdid = pla_result.loc[post_term[0] :, "sdid"].mean()
+            pre_object = pla_result["object"].head(len(pla_hat_lambda)) @ pla_hat_lambda
+            post_object = pla_result.loc[post_term[0] :, "object"].mean()
 
             pre_treat = (pla_Y_pre_t.T @ pla_hat_lambda).values[0]
-            sdid_counterfuctual_post_treat = pre_treat + (post_sdid - pre_sdid)
+            object_counterfuctual_post_treat = pre_treat + (post_object - pre_object)
 
-            result_tau_sdid.append(
-                post_placebo_treat - sdid_counterfuctual_post_treat
+            result_tau_object.append(
+                post_placebo_treat - object_counterfuctual_post_treat
             )
-    return (np.var(result_tau_sdid))
+    return (np.var(result_tau_object))
 
 
 
