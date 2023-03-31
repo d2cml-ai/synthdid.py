@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np, pandas as pd
 
 def fw_step(A, b, x, eta, alpha=None):
     Ax = np.dot(A, x)
@@ -33,12 +33,13 @@ def sc_weight_fw(A, b, x=None, intercept=True, zeta=1, min_decrease=1e-3, max_it
     t = 0
     vals = np.zeros(max_iter)
     eta = n * np.real(zeta ** 2)
-    while (t < max_iter) and (t < 2 or vals[t-2] - vals[t-1] > min_decrease ** 2):
-        t += 1
+    while (t < max_iter) and ((t < 1) or (vals[t-1] - vals[t-2] > min_decrease ** 2)):
         x_p = fw_step(A, b, x, eta=eta)
         x = x_p
         err = np.dot(A, x) - b
         vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
+        t += 1
+    print(t, vals[t-2] - vals[t-1])
     return {"params": x, "vals": vals}
 
 
@@ -70,7 +71,7 @@ for i, time_eval in enumerate(ttime):
     N1 = len(np.unique(df_y.query("treated == 1").unit))
     T1 = int(np.max(tdf.time) - time_eval + 1)
     T_total += N1 * T1
-    tau_hat_wt[i] = N1 * T1
+    tau_hat_wt.append(N1 * T1) 
     Y = df_y.pivot_table(index="unit", columns="time", values="outcome", sort = False)
     N, T = Y.shape
     N0, T0 = int(N - N1), int(T - T1)
@@ -86,15 +87,16 @@ for i, time_eval in enumerate(ttime):
     zeta_lambda = eta_lambda * noise_level
     min_decrease = 1e-5 * noise_level
     
-    Al, bl = Yc.iloc[:N0-1, :T0], Yc.iloc[:N0-1, T0]
-    Ao, bo = Yc.T.iloc[:T0, :N0-1], Yc.T.iloc[:T0, N0]
+    Al, bl = Yc.iloc[:N0, :T0], Yc.iloc[:N0, T0]
+    Ao, bo = Yc.T.iloc[:T0, :N0], Yc.T.iloc[:T0, N0]
    
-    # lambda_intercept = True
-    # omega_intercept = True
-    # max_iter_pre_sparsify = 100
+    lambda_intercept = True
+    omega_intercept = True
+    max_iter_pre_sparsify, max_iter = 100, 10000
 # if covariates is None or cov_method == "projected":
     lambda_opt = sc_weight_fw(Al, bl, None, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
     omega_opt = sc_weight_fw(Ao, bo, None, intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
+
 
     if sparsify is not None:
         lambda_opt = sc_weight_fw(Al, bl, sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)
@@ -104,12 +106,32 @@ for i, time_eval in enumerate(ttime):
     omega_est = omega_opt["params"]
     
 
-    omg = np.concatenate(([-omega_est, np.full(2, 1/2)]))
+    omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
     lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
 
     tau_hat[i] = np.dot(omg, Y) @ lmd
 
+A, b = Al, bl
+x = None
+zeta = zeta_lambda
+intercept = True
 
-np.array(prediff)[1]
-varianza(prediff.to_numpy().flatten())
-prediff
+n, k = A.shape
+if x is None:
+    x = np.full(k, 1/k)
+if intercept:
+    A = A - np.mean(A, axis=0)
+    b = b - np.mean(b)
+t = 0
+vals = np.zeros(max_iter)
+eta = n * np.real(zeta ** 2)
+print(t < max_iter, t<2)
+# while (t < max_iter) and (t < 2 or vals[t-2] - vals[t-1] > min_decrease ** 2):
+x_p = fw_step(A, b, x, eta=eta)
+x = x_p
+err = np.dot(A, x) - b
+vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
+print(vals[t])
+t += 1
+sum(x)
+# return {"params": x, "vals": vals}

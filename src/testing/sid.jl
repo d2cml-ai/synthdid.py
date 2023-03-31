@@ -1,8 +1,8 @@
 using DataFrames, CSV, Statistics
 function data_setup(
-	data::DataFrame, S_col::Union{String, Symbol}, 
-	T_col::Union{String, Symbol}, D_col::Union{String, Symbol}
-	)
+  data::DataFrame, S_col::Union{String,Symbol},
+  T_col::Union{String,Symbol}, D_col::Union{String,Symbol}
+)
 
   select!(groupby(data, S_col), :, D_col => maximum => :tunit)
   data.ty = @. ifelse(data[:, D_col] == 0, nothing, data[:, T_col])
@@ -38,7 +38,7 @@ function projected(data, Y_col, S_col, T_col, covariates)
 
   # Calculate adjusted Y
   Y_adj = y - X * beta
-  
+
   # Output projected data
   data[:, Y_col] = Y_adj
   return data
@@ -66,9 +66,9 @@ end
 function collapse_form(Y::Matrix, N0::Int64, T0::Int64)
   N, T = size(Y)
   Y_T0N0 = Y[1:N0, 1:T0]
-  Y_T1N0 = mean(Y[1:N0, T0 + 1:end], dims = 2)
-  Y_T0N1 = mean(Y[N0 + 1:end, 1:T0], dims = 1)
-  Y_T1N1 = mean(Y[N0 + 1:end, T0 + 1:end])
+  Y_T1N0 = mean(Y[1:N0, T0+1:end], dims=2)
+  Y_T0N1 = mean(Y[N0+1:end, 1:T0], dims=1)
+  Y_T1N1 = mean(Y[N0+1:end, T0+1:end])
 
   return [Y_T0N0 Y_T1N0; Y_T0N1 Y_T1N1]
 end
@@ -123,9 +123,9 @@ function random_low_rank()
 end
 
 function fw_step(
-	A::Matrix, b::Vector, x::Vector; eta::Number, 
-	alpha::Union{Nothing,Float64} = nothing
-	)::Vector{Float64}
+  A::Matrix, b::Vector, x::Vector; eta::Number,
+  alpha::Union{Nothing,Float64}=nothing
+)::Vector{Float64}
   Ax = A * x
   half_grad = (Ax .- b)' * A + eta * x'
   i = findmin(half_grad)[2][2]
@@ -149,49 +149,50 @@ function fw_step(
 end
 
 function sc_weight_fw(
-	A::Matrix, b::Vector, x::Union{Vector, Nothing} = nothing; 
-	intercept::Bool = true, zeta::Number,
-	min_decrease::Number = 1e-3, max_iter::Int64 = 1000
-	)
-  
+  A::Matrix, b::Vector, x::Union{Vector,Nothing}=nothing;
+  intercept::Bool=true, zeta::Number,
+  min_decrease::Number=1e-3, max_iter::Int64=1000
+)
+
   k = size(A, 2)
   n = size(A, 1)
   if isnothing(x)
     x = fill(1 / k, k)
   end
   if intercept
-    A = A .- mean(A, dims = 1)
-    b = b .- mean(b, dims = 1)
+    A = A .- mean(A, dims=1)
+    b = b .- mean(b, dims=1)
   end
 
   t = 0
   vals = zeros(max_iter)
-  eta = n * real(zeta ^ 2)
-  while (t < max_iter) && (t < 2 || vals[t-1] - vals[t] > min_decrease ^ 2)
+  eta = n * real(zeta^2)
+  while (t < max_iter) && (t < 2 || vals[t-1] - vals[t] > min_decrease^2)
     t += 1
-    x_p = fw_step(A, b, x, eta = eta)
+    x_p = fw_step(A, b, x, eta=eta)
     x = x_p
     err = A * x - b
     vals[t] = real(zeta^2) * sum(x .^ 2) + sum(err .^ 2) / n
   end
+  print(t, vals[t-1])
   Dict("params" => x, "vals" => vals)
 end;
 
 
 function sparsify_function(v::Vector)
-  v[v .<= maximum(v) / 4] .= 0
+  v[v.<=maximum(v)/4] .= 0
   return v ./ sum(v)
 end
 
 
 function california_prop99()
-    url = "https://github.com/d2cml-ai/Synthdid.jl/raw/stag_treat/data/california_prop99.csv"
-    return CSV.read(download(url), delim=";", DataFrame)
+  url = "https://github.com/d2cml-ai/Synthdid.jl/raw/stag_treat/data/california_prop99.csv"
+  return CSV.read(download(url), delim=";", DataFrame)
 end
 
 function quota()
-    url = "https://github.com/d2cml-ai/Synthdid.jl/raw/stag_treat/data/quota.csv"
-	return CSV.read(download(url), DataFrame)
+  url = "https://github.com/d2cml-ai/Synthdid.jl/raw/stag_treat/data/quota.csv"
+  return CSV.read(download(url), DataFrame)
 end
 
 cal = california_prop99()
@@ -203,7 +204,7 @@ Y_col = Symbol(Y_col)
 S_col = Symbol(S_col)
 T_col = Symbol(T_col)
 D_col = Symbol(D_col)
-
+ate = Float64[]
 
 
 tdf = data_setup(cal, S_col, T_col, D_col)
@@ -216,7 +217,7 @@ year = tyears[1]
 
 df_y = tdf[in.(tdf.tyear, Ref([year, nothing])), [Y_col, S_col, T_col, :tunit]]
 
-N1 = size(unique(df_y[df_y.tunit .== 1, S_col]), 1)
+N1 = size(unique(df_y[df_y.tunit.==1, S_col]), 1)
 T1 = maximum(tdf[:, T_col]) - year + 1
 T_total += N1 * T1
 T_post = N1 * T1
@@ -230,24 +231,69 @@ T0 = T - T1
 Yc = collapse_form(Y, N0, T0)
 
 # calculate penalty parameters
-prediff = diff(Y[1:N0, 1:T0], dims = 2)
-noise_level = std(diff(Y[1:N0, 1:T0], dims = 2)) # gotta fix this, probably its own function
+prediff = diff(Y[1:N0, 1:T0], dims=2)
+noise_level = std(diff(Y[1:N0, 1:T0], dims=2)) # gotta fix this, probably its own function
 eta_omega = ((size(Y, 1) - N0) * (size(Y, 2) - T0))^(1 / 4)
 eta_lambda = 1e-6
 zeta_omega = eta_omega * noise_level
 zeta_lambda = eta_lambda * noise_level
 min_decrease = 1e-5 * noise_level
 
+sparsify = sparsify_function
+lambda_intercept, omega_intercept = true, true
+max_iter_pre_sparsify = 100
+max_iter = 10000
 
+# calculate lambda and omega for Y
+lambda_opt = sc_weight_fw(Yc[1:N0, 1:T0], Yc[1:N0, end], nothing, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
 
-
-function varianza(x)
-    n = length(x)
-    media = sum(x) / n
-    return sum([(xi - media) ^ 2 for xi in x]) / (n - 1)
+if !isnothing(sparsify)
+  lambda_opt = sc_weight_fw(Yc[1:N0, 1:T0], Yc[1:N0, end], sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)
 end
 
+lambda = lambda_opt["params"]
 
-sqrt(varianza([1, 2, -4, 5, 9]))
+omega_opt = sc_weight_fw(Yc'[1:T0, 1:N0], Yc[end, 1:T0], nothing, intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
 
-varianza(prediff)
+if !isnothing(sparsify)
+  omega_opt = sc_weight_fw(Yc'[1:T0, 1:N0], Yc[end, 1:T0], sparsify(omega_opt["params"]), intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter)
+end
+
+# add omega info to update
+omega = omega_opt["params"]
+
+tau_hat = [-omega; fill(1 / N1, N1)]' * Y * [-lambda; fill(1 / T1, T1)]
+ate = [ate; T_post * tau_hat]
+ate
+
+sum(ate) / T_total
+
+Al, bl = Yc[1:N0, 1:T0], Yc[1:N0, end]
+
+A, b = copy(Al), copy(bl)
+x = nothing
+intercept = true
+zeta = zeta_lambda
+n, k = size(Al)
+if isnothing(x)
+  x = fill(1 / k, k)
+end
+if intercept
+  A = A .- mean(A, dims=1)
+  b = b .- mean(b, dims=1)
+end
+t = 0
+vals = zeros(max_iter)
+eta = n * real(zeta^2)
+print(t < max_iter, t < 2)
+# while (t < max_iter) && (t < 2 || vals[t-1] - vals[t] > min_decrease ^ 2)
+t += 1
+x_p = fw_step(A, b, x, eta=eta)
+x = x_p
+err = A * x - b
+vals[t] = real(zeta^2) * sum(x .^ 2) + sum(err .^ 2) / n
+print(vals[t])
+sum(x)
+# end
+
+print((vals[t-1] - vals[t]))
