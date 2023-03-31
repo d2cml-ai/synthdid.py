@@ -15,57 +15,11 @@ def sparsify(V):
     W = W / np.sum(W)
     return W
 
-# def lambda_min(A: np.ndarray, b, x, eta, zeta, maxIter: int, minDecrease):
-#     row, col = A.shape
-#     vals = np.zeros(maxIter)
-#     t = 0
-#     dd = 1
-
-#     # print("lambda")
-#     while (t < maxIter and (t < 2 or dd > minDecrease)):
-#         t += 1
-#         Ax = A @ x
-#         # hg = np.transpose(Ax - b).dot(A) + eta * x
-#         hg = np.dot(np.transpose(np.dot(A, x) - b), A) + eta * x
-#         i = np.argmin(hg)
-#         if(t % 1000 == 0):
-#             print(i)
-#         dx = -x.copy()
-
-#         dx[i] = 1 - x[i]
-#         v = np.abs(np.min(dx)) + np.abs(np.max(dx))
-#         if v == 0:
-#             x = x
-#         else:
-#             derr = A[:, i] - Ax
-#             step = -np.transpose(hg).dot(dx) / \
-#                 (np.sum(derr**2) + eta * np.sum(dx**2))
-#             conststep = min([1, max([0, step])])
-#             x = x + conststep * dx
-#         # if t > 1:
-#         #     dd = abs(np.sum(vals[t-1] - vals[t-2]))
-
-#         # vals[t-1] = np.sum(np.abs(Ax - b)) + eta * np.sum(np.abs(x))
-
-#     return x
-
 def varianza(x):
     n = len(x)
     media = sum(x) / n
     return sum((xi - media) ** 2 for xi in x) / (n - 1)
 
-# import rpy2.robjects as r
-
-# r.r('set.seed(1235)')
-# r.r('n <- 100')
-# r.r('p <- 20')
-# A = np.array(r.r('A <- matrix(rnorm(n * p), n, p)'))
-# b = np.array(r.r('b <- rnorm(n)'))
-# x_true = np.array(r.r('x_true <- runif(p)'))
-# eta = r.r('eta <- 0.1')
-# zeta = r.r('zeta <- 0.1')
-# maxIter = 10000
-# minDecrease = 1e-6
 
 def lambda_min(A, b, lambda_v, eta, zeta, maxIter, minDecrease):
     
@@ -157,7 +111,8 @@ class sdid:
         sig_t0_ref = np.zeros(len(break_points))
         w_omega, w_lambda = np.ones(
             len(break_points)), np.ones(len(break_points))
-        for i in range(len(break_points)):
+        # for i in range(len(break_points)):
+        for i in range(3):
             this_year = break_points[i]
             cond1 = data_ref["tyear"] == this_year
             cond2 = data_ref["tyear"] == 0
@@ -241,7 +196,12 @@ class sdid:
 
             tau[i] = (l_o.T @ pd.DataFrame(ytra)) @ l_l
             tau_wt[i] = yNtr * Npost
+            # print(sig_t)
         tau_wt = tau_wt / np.sum(tau_wt)
+        # print(l_o)
+        print(lambda_l2)
+        # print("\n")
+        print(tau)
         self.att = tau_wt @ tau
         self.tau_wt = tau_wt
         self.tau = tau
@@ -253,11 +213,11 @@ class sdid:
 
 # if __name__ == "__main__":
 mt = 1
-# print("california")
-# prop_99 = pd.read_stata("http://www.damianclarke.net/stata/prop99_example.dta")
-# df = sdid(prop_99, "state", "year", "treated", "packspercapita").panel_data().synth_did()
-# df.sig_t
-# print(df.att)
+print("california")
+prop_99 = pd.read_stata("http://www.damianclarke.net/stata/prop99_example.dta")
+df = sdid(prop_99, "state", "year", "treated", "packspercapita").panel_data().synth_did()
+df.sig_t
+print(df.att)
 print("quota_basic")
 
 quota = pd.read_stata("data/quota_example.dta", convert_categoricals=False)
@@ -268,4 +228,10 @@ df = sdid(data=quota, unit=unit, time=time,
 df_1 = df.synth_did()
 print(df_1.att)
 
+z = [1, 23, 0]
+
+l, o = [], []
+
+for a in range(3):
+    l.append(z), o.append(z)
 
