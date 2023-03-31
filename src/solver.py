@@ -31,16 +31,16 @@ def sc_weight_fw(A, b, x=None, intercept=True, zeta=1, min_decrease=1e-3, max_it
         A = A - np.mean(A, axis=0)
         b = b - np.mean(b)
     t = 0
-    vals = np.zeros(max_iter)
+    vals = np.zeros(max_iter + 1)
     eta = n * np.real(zeta ** 2)
-    while (t < max_iter) and ((t < 1) or (vals[t-1] - vals[t-2] > min_decrease ** 2)):
+    while (t < max_iter) and ((t < 2) or (vals[t-2] - vals[t-1] > min_decrease ** 2)):
         x_p = fw_step(A, b, x, eta=eta)
         x = x_p
         err = np.dot(A, x) - b
         vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
         t += 1
-    print(t, vals[t-2] - vals[t-1])
-    return {"params": x, "vals": vals}
+    print(t, vals[t-1])
+    return {"params": x, "vals": vals[1: ]}
 
 
 def collapsed_form(Y, N0, T0):
@@ -123,15 +123,16 @@ if intercept:
     A = A - np.mean(A, axis=0)
     b = b - np.mean(b)
 t = 0
-vals = np.zeros(max_iter)
+vals = np.zeros(max_iter )
 eta = n * np.real(zeta ** 2)
 print(t < max_iter, t<2)
-# while (t < max_iter) and (t < 2 or vals[t-2] - vals[t-1] > min_decrease ** 2):
-x_p = fw_step(A, b, x, eta=eta)
-x = x_p
-err = np.dot(A, x) - b
-vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
-print(vals[t])
-t += 1
-sum(x)
+while (t < max_iter) and (t < 2 or vals[t-2] - vals[t-1] > min_decrease ** 2):
+    x_p = fw_step(A, b, x, eta=eta)
+    x = x_p
+    err = np.dot(A, x) - b
+    vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
+    t += 1
+    sum(x)
 # return {"params": x, "vals": vals}
+print(vals[t])
+print(t)
