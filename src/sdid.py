@@ -1,11 +1,12 @@
 import numpy as np, pandas as pd
-# from get_data import quota, california_prop99
+from get_data import quota, california_prop99
 from utils import panel_matrices, collapse_form
 from solver import fw_step, sc_weight_fw
 
 
 def sparsify_function(v) -> np.array:
-	return np.where(v <= np.max(v) / 4, 0, v)
+	v = np.where(v <= np.max(v) / 4, 0, v)
+	return v / sum(v)
 
 def varianza(x):
 	n = len(x)
@@ -23,7 +24,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 	
 	T_total = 0
 	break_points = len(ttime)
-	tau_hat, tau_hat_wt = np.zeros(break_points), []
+	tau_hat, tau_hat_wt = np.zeros(break_points), np.zeros(break_points)
 
 	lambda_estimate, omega_estimate = [], []
 
@@ -33,11 +34,11 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 		N1 = len(np.unique(df_y.query("treated == 1").unit))
 		T1 = int(np.max(tdf.time) - time_eval + 1)
 		T_total += N1 * T1
-		tau_hat_wt.append(N1 * T1) 
+		tau_hat_wt[i] = N1 * T1 
 		Y = df_y.pivot_table(index="unit", columns="time", values="outcome", sort = False)
 		N, T = Y.shape
 		N0, T0 = int(N - N1), int(T - T1)
-		Yc = collapsed_form(Y, N0, T0)
+		Yc = collapse_form(Y, N0, T0)
 
 		prediff = Y.iloc[:N0, :T0].apply(lambda x: x.diff(), axis=1).iloc[:, 1:]
 		noise_level = np.sqrt(varianza(np.array(prediff).flatten()))
@@ -69,19 +70,22 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 			tau_hat[i] = np.dot(omg, Y) @ lmd
 
 		
+	# print(tau_hat_wt, T_total)
 	tau_hat_wt = tau_hat_wt / T_total
 
 	att = np.dot(tau_hat, tau_hat_wt)
 
 	att_info = pd.DataFrame(
 		{
-			time: ttime,
-			att_time : tau_hat,
-			att_wt : tau_hat_wt
+			"time": ttime,
+			"att_time" : tau_hat,
+			"att_wt" : tau_hat_wt
 		}
 	)
 
 	return att
+
+
 
 
 
