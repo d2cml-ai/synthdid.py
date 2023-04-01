@@ -1,130 +1,237 @@
-import pandas as pd
+
 import numpy as np
-
-from solver import *
-
-def gen_data(
-    df,
-    pre_term, 
-    post_term, 
-    treatment: list
-):
-
-    control = [col for col in df.columns if col not in treatment]
-
-    Y_pre_c = df.loc[pre_term[0]: pre_term[1], control]
-    Y_pre_t = df.loc[pre_term[0]: pre_term[1], treatment]
-
-    Y_post_c = df.loc[post_term[0]: post_term[1], control]
-    Y_post_t = df.loc[post_term[0]: post_term[1], treatment]
-
-    return Y_pre_c, Y_pre_t, Y_post_c, Y_post_t
+import pandas as pd
+import time as ttm
 
 
-def target_y(df, pre_term, post_term, treatment):
-    return df.loc[pre_term[0]: post_term[1], treatment].mean(axis = 1)
+def sparsify(V):
+    n_V = len(V)
+    W = np.zeros(n_V)
+    for i in range(n_V):
+        if V[i] <= np.max(V) / 4:
+            W[i] = 0
+        else:
+            W[i] = V[i]
+    W = W / np.sum(W)
+    return W
 
-def sdid_trajectory(hat_omega, hat_lambda, Y_pre_c, Y_post_c):
+def varianza(x):
+    n = len(x)
+    media = sum(x) / n
+    return sum((xi - media) ** 2 for xi in x) / (n - 1)
 
-    hat_omega = hat_omega[:-1]
-    Y_c = pd.concat([Y_pre_c, Y_post_c])
-    n_features = Y_pre_c.shape[1]
-    start_w = np.repeat(1 / n_features, n_features)
 
-    _intercept = (start_w - hat_omega) @ Y_pre_c.T @ hat_lambda
-
-    return Y_c.dot(hat_omega) + _intercept
-
-def sc_potentical_outcome(Y_pre_c, Y_post_c, hat_omega_ADH):
-    return pd.concat([Y_pre_c, Y_post_c]).dot(hat_omega_ADH)
-
-def synthdid_estimate(
-    df, 
-    pre_term, 
-    post_term, 
-    treatment
-):
+def lambda_min(A, b, lambda_v, eta, zeta, maxIter, minDecrease):
     
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
-    n_treat = len(treatment)
-    n_post_term = len(Y_post_t)
+    row, col = A.shape
+    vals = np.zeros(maxIter)
+    t = 0
+    dd = 1
+    while t < maxIter and ((t < 2) or (dd > minDecrease)):    
+        t += 1
+        Ax = A @ lambda_v
+        hg = np.transpose(Ax - b) @ A + eta * lambda_v 
+        i = np.argmin(hg)
+        dx = -(lambda_v.copy())
+        dx[i] = 1 - lambda_v[i]
+        v = np.abs(np.min(dx)) + np.abs(np.max(dx))
+        # if t % 20 == 0:
+        #     print(v)
+        if v == 0:
+            lambda_v =lambda_v 
+        else:
+            derr = A[:, i] - Ax
+            step = -np.transpose(hg).dot(dx) / \
+                (np.sum(derr**2) + eta * np.sum(dx**2))
+            conststep = min([1, max([0, step])])
+            lambda_v = lambda_v + conststep * dx
+    return lambda_v 
 
-    zeta = est_zeta(n_treat, n_post_term, Y_pre_c)
-    hat_omega = est_omega(l2_loss, Y_pre_c, Y_pre_t, zeta)
-    hat_lambda = est_lambda(l2_loss, Y_pre_c, Y_post_c)
 
-    result = pd.DataFrame({"actual_y": target_y(df, pre_term, post_term, treatment)})
-    actual_post_treat = result.loc[post_term[0]: , "actual_y"].mean()
 
-    result["sdid"] = sdid_trajectory(hat_omega, hat_lambda, Y_pre_c, Y_post_c)
 
-    pre_sdid = result["sdid"].head(len(hat_lambda)) @ hat_lambda
-    post_sdid = result.loc[post_term[0]: , "sdid"].mean()
 
-    pre_treat = (Y_pre_t.T @ hat_lambda).values[0]
-    counterfactual_post_treat = pre_treat + (post_sdid - pre_sdid)
 
-    return { "estimate": (actual_post_treat - counterfactual_post_treat), "df":df, "pre_term": pre_term, "post_term": post_term, "treatment": treatment,
-            "Y_pre_c": Y_pre_c, "Y_pre_t": Y_pre_t, "Y_post_c":Y_post_c, "Y_post_t":Y_post_t,
-            "n_treat": n_treat, "n_post_term": n_post_term, "zeta":zeta, "hat_omega":hat_omega, "hat_lambda":hat_lambda}
+class sdid:
+    def __init__(self, data, unit, time, treatment, outcome):
+        self.data = data
+        self.unit = unit
+        self.time = time
+        self.treatment = treatment
+        self.outcome = outcome
+        self.Y = None
+        self.break_points = None
+        self.data_ref = None
+        self.w = None
+        self.N0 = None
+        self.T0 = None
+        self.summary = None
+        self.new_columns = "unit", "time", "outcome", "treatment"
 
-def sdid_params(df, pre_term, post_term, treatment):
+    def panel_data(self):
+        unit, time, treatment, outcome = self.unit, self.time, self.treatment, self.outcome
+        data = self.data
+        data_0 = pd.DataFrame()
+        data_0[["unit", "time", "outcome"]] = data[[unit, time, outcome]]
+        data_0["treatment"] = data[treatment].to_numpy()
 
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
-    n_treat = len(treatment)
-    n_post_term = len(Y_post_t)
+        unit, time, outcome, treatment = data_0.columns
+        self.unit, self.time, self.outcome, self.treatment = data_0.columns
+        data_1 = (
+            data_0
+            .groupby(unit, group_keys=False).apply(lambda x: x.assign(
+                treated=x[treatment].max(),
+                ty=np.where(x[treatment] == 1, x[time], np.nan),
+            ))
+            .reset_index(drop=True)
+            .groupby(unit, group_keys=False).apply(
+                lambda x: x.assign(
+                    tyear=np.where(x.treated == 1, x.ty.min(), np.nan)
+                )
+            )
+            .reset_index(drop=True)
+            .sort_values(["treated", unit, time])
+        )
+        N = len(np.array(np.unique(data_1[unit])))
 
-    zeta = est_zeta(n_treat, n_post_term, Y_pre_c)
-    hat_omega = est_omega(l2_loss, Y_pre_c, Y_pre_t, zeta)
-    hat_lambda = est_lambda(l2_loss, Y_pre_c, Y_post_c)
+        break_points = np.unique(data_1["tyear"])
+        break_points = break_points[~np.isnan(break_points)]
+        self.break_points = break_points
 
-    return {"zeta": zeta, "hat_omega": hat_omega, "hat_lambda": hat_lambda}
+        num_col = data_1.select_dtypes(np.number).columns
+        data_ref = data_1[num_col].fillna(0)
+        data_ref[unit] = data_1[unit]
+        self.data_ref = data_ref
+        return self
 
-def sc_estimate(
-        df, 
-        pre_term, 
-        post_term, 
-        treatment, 
-        additional_X = pd.DataFrame(), 
-        additional_y = pd.DataFrame()
-):
+    def synth_did(self):
+        break_points, data_ref = self.break_points, self.data_ref
+        unit, time, outcome, treatment = self.new_columns
+        tau, tau_wt = np.zeros(len(break_points)), np.zeros(len(break_points))
+        sig_t0_ref = np.zeros(len(break_points))
+        w_omega, w_lambda = np.ones(
+            len(break_points)), np.ones(len(break_points))
+        # for i in range(len(break_points)):
+        for i in range(3):
+            this_year = break_points[i]
+            cond1 = data_ref["tyear"] == this_year
+            cond2 = data_ref["tyear"] == 0
+            cond = cond1 + cond2
+            yData = data_ref.loc[cond, :]
 
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+            yNg = len(np.unique(yData[unit]))
+            yN = yData.shape[0]
+            yNT = yData.groupby(unit).size().min()
 
-    result = pd.DataFrame({"actual_y": target_y(df, pre_term, post_term, treatment)})
-    actual_post_treat = result.loc[post_term[0]: , "actual_y"].mean()
+            yNtr = sum(cond1) / yNT
+            yNco = sum(cond2) / yNT
 
-    hat_omega_ADH = solver.est_omega_ADH(
-        Y_pre_c, 
-        Y_pre_t, 
-        additional_X = additional_X,
-        additional_y = additional_y
-    )
-        
-    result["sc"] = sc_potentical_outcome(Y_pre_c, Y_post_c, hat_omega_ADH)
-    post_sc = result.loc[post_term[0]:, "sc"].mean()
-    counterfactual_post_treat = post_sc
+            yTpost = np.max(yData[time]) - this_year + 1
+            Npre = len(np.unique(data_ref.query(
+                f"{time} < {this_year}")[time]))
+            Npost = yNT - Npre
+            ndiff = yNg - Npre
+            ydiff = yData[outcome].diff()
+            first = np.arange(yN) % yNT == 0
 
-    return actual_post_treat - counterfactual_post_treat
+            postt = yData[time] >= this_year
+            dropc = first + postt + yData["treated"]
 
-def sc_params(df, pre_term, post_term, treatment, additional_X = pd.DataFrame(), additional_y = pd.DataFrame()):
+            preDiff = ydiff[dropc == 0] 
+            sig_t = np.sqrt(varianza(preDiff.to_numpy()))
+            sig_t0_ref[i] = sig_t
+            EtaLambda = 1e-6
+            EtaOmega = (yNtr * yTpost) ** (1 / 4) if mt != 3 else 1e-6
 
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+            yZetaOmega = EtaOmega * sig_t
+            yZetaLambda = EtaLambda * sig_t
 
-    hat_omega_ADH = solver.est_omega_ADH(
-        Y_pre_c, 
-        Y_pre_t, 
-        additional_X = additional_X,
-        additional_y = additional_y
-    )
+            ytreated = (
+                yData
+                .assign(ytreated=lambda x: x['tyear'] == this_year)
+                .groupby(unit)
+                .agg(ytreat=('ytreated', 'sum'))
+                .reset_index()
+                .query('ytreat > 0')
+                [unit]
+                .tolist()
+            )
 
-    return {"hat_omega": hat_omega_ADH}
+            Y = yData.pivot_table(index=unit, columns=time, values=outcome)
+            Y1 = yData.query(f"{unit} in @ytreated")
+            Y0 = Y.query(f"{unit} not in @ytreated")
 
-def did_estimate(df, pre_term, post_term, treatment):
+            promt = Y0.iloc[:, Npre:].mean(axis=1)
+            A = Y0.values
+            A_l = A[:, :Npre] - A[:, :Npre].mean(axis=0)
+            b_l = promt - promt.mean()
 
-    Y_pre_c, Y_pre_t, Y_post_c, Y_post_t = gen_data(df, pre_term, post_term, treatment)
+            A_o = (A[:, :Npre].T - np.mean(A[:, :Npre], axis=1))
+            b_ = Y1[outcome]
+            b_o = b_[:Npre] - np.mean(b_)
 
-    actual_post_treat = Y_post_t.mean(axis=1).mean() - Y_pre_t.mean(axis=1).mean()
-    counterfactual_post_treat = Y_post_c.mean(axis=1).mean() - Y_pre_c.mean(axis=1).mean()
+            lambda_l = np.repeat([1 / A_l.shape[1]], A_l.shape[1])
+            lambda_o = np.repeat([1 / A_o.shape[1]], A_o.shape[1])
 
-    return actual_post_treat - counterfactual_post_treat
+            mindec = (1e-5 * sig_t) ** 2
+            eta_o = Npre * yZetaOmega ** 2
+            eta_l = yNco * yZetaLambda ** 2
+
+            lambda_l = lambda_min(A_l, b_l, lambda_l,
+                                  eta_l, yZetaLambda, 100, mindec)
+            lambda_l1 = sparsify(lambda_l)
+            lambda_l2 = lambda_min(A_l, b_l, lambda_l1,
+                                   eta_l, yZetaLambda, 1000, mindec)
+
+            lambda_o = lambda_min(A_o, b_o, lambda_o,
+                                  eta_o, yZetaOmega, 100, mindec)
+            lambda_o1 = sparsify(lambda_o)
+            lambda_o2 = lambda_min(A_o, b_o, lambda_o1,
+                                   eta_o, yZetaOmega, 1000, mindec)
+
+            ytra = yData[self.outcome].to_numpy().reshape(Y.shape)
+
+            l_o = (np.concatenate([-lambda_o2, np.repeat([1 / yNtr], yNtr)]))
+            l_l = (np.concatenate([-lambda_l2, np.repeat([1 / Npost], Npost)]))
+
+            tau[i] = (l_o.T @ pd.DataFrame(ytra)) @ l_l
+            tau_wt[i] = yNtr * Npost
+            # print(sig_t)
+        tau_wt = tau_wt / np.sum(tau_wt)
+        # print(l_o)
+        print(lambda_l2)
+        # print("\n")
+        print(tau)
+        self.att = tau_wt @ tau
+        self.tau_wt = tau_wt
+        self.tau = tau
+        self.sig_t = sig_t0_ref
+        return self
+
+    def summary(self):
+        print(self.summary)
+
+# if __name__ == "__main__":
+mt = 1
+print("california")
+prop_99 = pd.read_stata("http://www.damianclarke.net/stata/prop99_example.dta")
+df = sdid(prop_99, "state", "year", "treated", "packspercapita").panel_data().synth_did()
+df.sig_t
+print(df.att)
+print("quota_basic")
+
+quota = pd.read_stata("data/quota_example.dta", convert_categoricals=False)
+unit, time, treatment, outcome = "country", "year", "quota", "womparl"
+df = sdid(data=quota, unit=unit, time=time,
+        treatment=treatment, outcome=outcome).panel_data()
+
+df_1 = df.synth_did()
+print(df_1.att)
+
+z = [1, 23, 0]
+
+l, o = [], []
+
+for a in range(3):
+    l.append(z), o.append(z)
+
