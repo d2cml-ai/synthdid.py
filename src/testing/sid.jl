@@ -174,7 +174,7 @@ function sc_weight_fw(
     err = A * x - b
     vals[t] = real(zeta^2) * sum(x .^ 2) + sum(err .^ 2) / n
   end
-  print(t, vals[t-1])
+  print(t, "\n")
   Dict("params" => x, "vals" => vals)
 end;
 
@@ -269,9 +269,10 @@ ate
 sum(ate) / T_total
 
 Al, bl = Yc[1:N0, 1:T0], Yc[1:N0, end]
+lambda_opt = sc_weight_fw(Yc[1:N0, 1:T0], Yc[1:N0, end], nothing, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
 
 A, b = copy(Al), copy(bl)
-x = nothing
+x = lambda_opt["params"]
 intercept = true
 zeta = zeta_lambda
 n, k = size(Al)

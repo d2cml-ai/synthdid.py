@@ -1,4 +1,4 @@
-import pandas as pd
+import pandas as pd, numpy as np
 
 def california_prop99() -> pd.DataFrame:
     return pd.read_csv("https://github.com/d2cml-ai/Synthdid.jl/raw/stag_treat/data/california_prop99.csv", sep=";")
