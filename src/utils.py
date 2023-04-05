@@ -1,13 +1,14 @@
 import pandas as pd, numpy as np
 from numpy.random import default_rng, poisson
 
-def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome): #-> data_prep
+def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covariates = None): #-> data_prep
 	if len(np.unique(data[treatment])) != 2:
 		print("s")
 
 	data_ref = pd.DataFrame()
 	data_ref[["unit", "time", "outcome"]] = data[[unit, time, outcome]]
 	data_ref["treatment"] = data[treatment].to_numpy()
+	other = data.drop(columns=[unit, time, outcome, treatment])
 
 	unit, time, outcome, treatment = data_ref.columns
 
@@ -34,6 +35,9 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome): #-> da
 	num_col = data_ref.select_dtypes(np.number).columns
 	data_ref = data_ref[num_col].fillna(0)
 	data_ref[unit] = units
+	data_ref = pd.concat([data_ref, other], axis = 1)
+	if covariates is not None:
+		data_ref[covariates] = data_ref[covariates].fillna(0)
 	data_ref = data_ref.sort_values(["treated", "time", "unit"])
 
 	return (data_ref, break_points)
@@ -48,3 +52,5 @@ def collapse_form(Y: np.ndarray, N0: int, T0: int) -> np.ndarray:
 	result_bottom = pd.concat([col_mean.T, pd.Series(overall_mean)], axis=0)
 	Yc = pd.concat([result_top, pd.DataFrame(result_bottom).T], axis=0)
 	return Yc
+
+# def projected(Y, )

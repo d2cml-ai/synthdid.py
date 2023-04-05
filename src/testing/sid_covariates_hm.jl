@@ -1,15 +1,13 @@
 ### A Pluto.jl notebook ###
 # v0.19.22
 
-#> [frontmatter]
-
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ 6eaa6510-d0a7-11ed-34e6-615c7693e1e9
+# ╔═╡ ab80fef0-d25e-11ed-1985-f94fc7748511
 using DataFrames, CSV, Statistics
 
-# ╔═╡ 74103105-4068-40e1-801b-58889bad44ab
+# ╔═╡ f6417b5e-cdae-448c-a471-aa137013138b
 begin
 	function data_setup(
 	  data::DataFrame, S_col::Union{String,Symbol},
@@ -96,7 +94,7 @@ begin
 	end
 end
 
-# ╔═╡ b070d585-1f28-4dd6-9c1f-f2c03465ea0a
+# ╔═╡ 29670cc2-cb14-44dd-a2f8-04b8fca792b8
 begin
 	function sparsify_function(v::Vector)
 	  v[v.<=maximum(v)/4] .= 0
@@ -117,254 +115,176 @@ begin
 	quot = quota()
 end
 
-# ╔═╡ 0f7aff69-746b-4239-b5a9-86c36a2ea328
+# ╔═╡ 7a50b044-9789-4bf2-ac55-fbcb54453cf9
 begin
-	mutable struct random_walk
-	  Y::Matrix
-	  n0::Number
-	  t0::Number
-	  L::Matrix
-	end
+	tdf = data_setup(quota(), :country, :year, :quota)
+	Y_col, S_col, T_col, D_col = :womparl, :country, :year, :quota
+	covariates = [:lngdp]
+end
+
+# ╔═╡ 439f3ae0-be72-4032-910e-a6bce3163458
+begin
+	  tyears = sort(unique(tdf.tyear)[.!isnothing.(unique(tdf.tyear))])
+	  T_total = sum(Matrix(unstack(tdf, S_col, T_col, D_col)[:, 2:end]))
+	  units = unique(tdf[:, S_col])
+	  N_out = size(units, 1)
 	
-	function random_low_rank()
-	  n0 = 100
-	  n1 = 10
-	  t0 = 120
-	  t1 = 20
-	  n = n0 + n1
-	  t = t0 + t1
-	  tau = 1
-	  sigma = 0.5
-	  rank = 2
-	  rho = 0.7
-	  var = [rho^(abs(x - y)) for x in 1:t, y in 1:t]
-	  W = Int.(1:n .> n0) * transpose(Int.(1:t .> t0))
-	
-	  # U = rand(Poisson(sqrt.(1:n) ./ sqrt(n)), n, rank)
-	  pU = Poisson(sqrt(sample(1:n)) ./ sqrt(n))
-	  pV = Poisson(sqrt(sample(1:t)) ./ sqrt(t))
-	  U = rand(pU, n, rank)
-	  V = rand(pV, t, rank)
-	
-	  # sample.(1:n)
-	
-	  alpha = reshape(repeat(10 * (1:n) ./ n, outer=(t, 1)), n, t)
-	  beta = reshape(repeat(10 * (1:t) ./ t, outer=(n, 1)), n, t)
-	  mu = U * V' + alpha + beta
-	  error = rand(pV, size(mu))
-	  Y = mu .+ tau .* W .+ sigma .* error
-	  random_data = random_walk(Y, n0, t0, mu)
-	  return random_data
-	end
+	  tdf_ori = copy(tdf)
+	  info_names = ["year", "tau", "weighted_tau", "N0", "T0", "N1", "T1"]
+	  year_params = DataFrame([[] for i in info_names], info_names)
+	  T_out = size(unique(tdf[:, T_col]), 1)
+	  info_beta = []
+end
+
+# ╔═╡ aa9c80d9-59b4-415c-bc19-849bc45583cd
+for year in tyears
+  info = []
+  df_y = tdf[in.(tdf.tyear, Ref([year, nothing])), [[Y_col, S_col, T_col, :tunit]; covariates]]
+  N1 = size(unique(df_y[df_y.tunit .== 1, S_col]), 1)
+  T1 = maximum(tdf[:, T_col]) - year + 1
+  T_post = N1 * T1
+
+  # create Y matrix
+  Y = Matrix(unstack(df_y, S_col, T_col, Y_col)[:, 2:end])
+  N = size(Y, 1)
+  T = size(Y, 2)
+  global N0 = N - N1
+  global T0 = T - T1
+  global Yc = collapse_form(Y, N0, T0)
+
+	# create penalty parameters
+  noise_level = std(diff(Y[1:N0, 1:T0], dims = 2)) # this needs fixed, maybe in its own function
+  eta_omega = ((size(Y, 1) - N0) * (size(Y, 2) - T0))^(1 / 4)
+  eta_lambda = 1e-6
+  global zeta_omega = eta_omega * noise_level
+  global zeta_lambda = eta_lambda * noise_level
+  global min_decrease = 1e-5 * noise_level
+
+  # create X vector of matrices
+  X = []
+  for covar in covariates
+	global X_temp = Matrix(unstack(df_y, S_col, T_col, covar)[:, 2:end])
+	push!(X, X_temp)
+  end
+end
+
+
+# ╔═╡ eb98e437-9cab-479d-a830-32157042ebf3
+begin
+	lambda_intercept, max_iter_pre_sparsify, sparsify = true, 100, sparsify_function
+	omega_intercept = true
+	max_iter = 1000
 	
 end
 
-# ╔═╡ a8be5b99-8791-4404-9b15-b1216122e7ad
+# ╔═╡ 46735155-a58a-465e-be61-dff16d7b54b8
+X = collapse_form(X_temp, N0, T0)
+
+# ╔═╡ fd4a3c7f-6d1f-46c8-8114-07a328f62453
 begin
-	function fw_step(
-	  A::Matrix, b::Vector, x::Vector; eta::Number,
-	  alpha::Union{Nothing,Float64}=nothing
-	)::Vector{Float64}
-	  Ax = A * x
-	  half_grad = (Ax .- b)' * A + eta * x'
-	  i = findmin(half_grad)[2][2]
-	  if !isnothing(alpha)
-	    x *= (1 - alpha)
-	    x[i] += alpha
-	    return x
-	  else
-	    d_x = -x
-	    d_x[i] = 1 - x[i]
-	    if all(d_x .== 0)
-	      return x
-	    end
-	    d_err = A[:, i] - Ax
-	    step_upper = -half_grad * d_x
-	    step_bot = sum(d_err .^ 2) + eta * sum(d_x .^ 2)
-	    step = step_upper[1] / step_bot
-	    constrained_step = min(1, max(0, step))
-	    return x + constrained_step * d_x
+	Y = Yc
+	N01, T01 = size(Y) .- 1
+end
+
+# ╔═╡ bb049657-5912-4bdc-82a6-8ba9331b40ef
+X_temp
+
+# ╔═╡ b1c49fdf-0279-4195-9af2-ed4d8a010f82
+begin
+	lambda, omega, beta = nothing, nothing, nothing
+	  if isnothing(lambda)
+	    lambda = repeat([1 / T0], T0)
 	  end
-	end
-	
-	function sc_weight_fw(
-	  A::Matrix, b::Vector, x::Union{Vector,Nothing}=nothing;
-	  intercept::Bool=true, zeta::Number,
-	  min_decrease::Number=1e-3, max_iter::Int64=1000
-	)
-	
-	  k = size(A, 2)
-	  n = size(A, 1)
-	  if isnothing(x)
-	    x = fill(1 / k, k)
+	  if isnothing(omega)
+	    omega = repeat([1 / N0], N0)
 	  end
-	  if intercept
-	    A = A .- mean(A, dims=1)
-	    b = b .- mean(b, dims=1)
+	  if isnothing(beta)
+ 		beta = zeros(size(X, 1))
 	  end
-	
-	  t = 0
-	  vals = zeros(max_iter)
-	  eta = n * real(zeta^2)
-	  while (t < max_iter) && (t < 2 || vals[t-1] - vals[t] > min_decrease^2)
-	    t += 1
-	    x_p = fw_step(A, b, x, eta=eta)
-	    x = x_p
-	    err = A * x - b
-	    vals[t] = real(zeta^2) * sum(x .^ 2) + sum(err .^ 2) / n
-	  end
-	  print(t, "\n")
-	  Dict("params" => x, "vals" => vals)
-	end;
-	
 end
 
-# ╔═╡ d428c86d-8ac4-499b-893b-dde3399a77af
+# ╔═╡ ee9d9b87-8e05-48b3-affc-21650ccd8f7b
 begin
-	Y_col, S_col, T_col, D_col = "PacksPerCapita", "State", "Year", "treated"
+	update_lambda, update_omega = true, true
 	
-	Y_col = Symbol(Y_col)
-	S_col = Symbol(S_col)
-	T_col = Symbol(T_col)
-	D_col = Symbol(D_col)
-	ate = Float64[]
-	
-	
-	tdf = data_setup(cal, S_col, T_col, D_col)
-	
-	tyears = sort(unique(tdf.tyear)[.!isnothing.(unique(tdf.tyear))])
-	T_total = 0
-	
-	
-	year = tyears[1]
-	
-	df_y = tdf[in.(tdf.tyear, Ref([year, nothing])), [Y_col, S_col, T_col, :tunit]]
-	
-	N1 = size(unique(df_y[df_y.tunit.==1, S_col]), 1)
-	T1 = maximum(tdf[:, T_col]) - year + 1
-	T_total += N1 * T1
-	T_post = N1 * T1
-	
-	# create Y matrix and collapse it
-	Y = Matrix(unstack(df_y, S_col, T_col, Y_col)[:, 2:end])
-	N = size(Y, 1)
-	T = size(Y, 2)
-	N0 = N - N1
-	T0 = T - T1
-	Yc = collapse_form(Y, N0, T0)
-	
-	# calculate penalty parameters
-	prediff = diff(Y[1:N0, 1:T0], dims=2)
-	noise_level = std(diff(Y[1:N0, 1:T0], dims=2)) # gotta fix this, probably its own function
-	eta_omega = ((size(Y, 1) - N0) * (size(Y, 2) - T0))^(1 / 4)
-	eta_lambda = 1e-6
-	zeta_omega = eta_omega * noise_level
-	zeta_lambda = eta_lambda * noise_level
-	min_decrease = 1e-5 * noise_level
-	
-	sparsify = sparsify_function
-	lambda_intercept, omega_intercept = true, true
 end
 
-# ╔═╡ 81506d33-4873-4614-aca9-55339adb70b0
+# ╔═╡ 64eebd0e-2fe7-4be5-a631-7025afcbe519
+
+
+# ╔═╡ ff4edbf2-6d1a-4212-a6bd-fb9460720eb1
+
+
+# ╔═╡ 8be586aa-313f-4ac0-bebe-e85cb8869ff9
+
+
+# ╔═╡ ec3cf44a-0b9b-45c2-94a3-a751bd0a48b9
+
+
+# ╔═╡ 1e9ab538-7730-41d5-8ebd-30a5dcbb6eae
 begin
-	max_iter_pre_sparsify = 100
-	max_iter = 10000
-	Al, bl = Yc[1:N0, 1:T0], Yc[1:N0, end];
+	X1 = [X, X]
+	length(X1)
 end
 
-# ╔═╡ efffa1ab-178c-47ef-8be4-ebca67e322df
+# ╔═╡ 60bf50ca-1eed-49de-b933-2b1c98135158
+function fw_step(
+  A::Matrix, b::Vector, x::Vector; eta::Number, 
+  alpha::Union{Nothing,Float64} = nothing
+)::Vector{Float64}
+  Ax = A * x
+  half_grad = (Ax .- b)' * A + eta * x'
+  i = findmin(half_grad)[2][2]
+  if !isnothing(alpha)
+    x *= (1 - alpha)
+    x[i] += alpha
+    return x
+  else
+    d_x = -x
+    d_x[i] = 1 - x[i]
+    if all(d_x .== 0)
+      return x
+    end
+    d_err = A[:, i] - Ax
+    step_upper = -half_grad * d_x
+    step_bot = sum(d_err .^ 2) + eta * sum(d_x .^ 2)
+    step = step_upper[1] / step_bot
+    constrained_step = min(1, max(0, step))
+    return x + constrained_step * d_x
+  end
+end
+
+# ╔═╡ 9d4f2d87-4a03-4122-ba71-1461a08c9a6d
+function update_weights(Y, lambda, omega)
+
+Y_lambda = if lambda_intercept Y[1:N0, :] .- mean(Y[1:N0, :], dims = 1) else Y[1:N0, :] end
+if update_lambda lambda = fw_step(Y_lambda[:, 1:T0], Y_lambda[:, T0 + 1], lambda, eta = N0 * real(zeta_lambda ^ 2)) end
+err_lambda = Y_lambda * [lambda; -1]
+
+Y_omega = if omega_intercept Y'[1:T0, :] .- mean(Y'[1:T0, :], dims = 1) else Y[:, 1:T0]' end
+if update_omega omega = fw_step(Y_omega[:, 1:N0], Y_omega[:, N0 + 1], omega, eta = T0 * real(zeta_omega ^ 2)) end
+err_omega = Y_omega * [omega; -1]
+
+val = real(zeta_omega ^ 2) * sum(omega .^ 2) + real(zeta_lambda ^ 2) * sum(lambda .^ 2) + sum(err_omega .^ 2) / T0 + sum(err_lambda .^ 2) / N0
+
+return Dict("val" => val, "lambda" => lambda, "omega" => omega, "err_lambda" => err_lambda, "err_omega" => err_omega)
+end
+
+
+# ╔═╡ ee34841e-2709-416f-94f1-c75c1d0a871e
+weights = update_weights(Yc, lambda, omega)
+
+# ╔═╡ d39aa8d6-1f89-43ad-b342-caf1ed45da77
+weights["val"] - 21.654189296597696
+
+# ╔═╡ 80820705-195b-4107-a5ec-0aad2dd1c0e7
+length(weights["err_lambda"]), length(weights["err_omega"]), size(X1[1])
+
+# ╔═╡ 52ca4744-7852-4b1f-8111-31fdf4a347a1
 begin
-	lambda_opt = sc_weight_fw(Al, bl, nothing, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
-	
-	# if !isnothing(sparsify)
-	#   lambda_opt = sc_weight_fw(Yc[1:N0, 1:T0], Yc[1:N0, end], sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)
-	# end
-	omega_opt = sc_weight_fw(Yc'[1:T0, 1:N0], Yc[end, 1:T0], nothing, intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
-	omega = omega_opt["params"]
-	lambda = lambda_opt["params"]
+	beta1 = [1, 2]
+	sum(beta1 .* X1)
 end
-
-# ╔═╡ 121ceeb6-784f-4969-934a-e59b84fbb0e8
-begin
-	lambda, omega
-end
-
-# ╔═╡ d8ed2d49-6eb4-4ab8-a090-8c04172f3a5f
-lambda[end]
-
-# ╔═╡ 846044d4-442d-4995-a7fd-1dc8c134bed3
-Ref
-
-# ╔═╡ c868efdd-42aa-4523-8506-35ecef34a0c0
-sum(bl)
-
-# ╔═╡ ffb0a86a-a46c-4dcc-97eb-2d9680bf04a9
-sc_weight_fw(Yc[1:N0, 1:T0], Yc[1:N0, end], sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)["params"]
-
-# ╔═╡ c8e2a12a-c0cb-4f9a-b4ee-68e76cf9c4d3
-sc_weight_fw(Yc'[1:T0, 1:N0], Yc[end, 1:T0], sparsify(omega_opt["params"]), intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter)["params"]
-
-# ╔═╡ bf39c951-3bf9-4bc5-8aa7-8a97ff8781ab
-begin
-	
-	A, b = copy(Al), copy(bl)
-	x = lambda
-	intercept = true
-	zeta = zeta_lambda
-	n, k = size(Al)
-	if isnothing(x)
-	  x = fill(1 / k, k)
-	end
-	if intercept
-	  A = A .- mean(A, dims=1)
-	  b = b .- mean(b, dims=1)
-	end
-	t = 0
-	vals = zeros(max_iter)
-	eta = n * real(zeta^2)
-	# print(t < max_iter, t < 2)
-	while (t < max_iter) && (t < 2 || vals[t-1] - vals[t] > min_decrease ^ 2)
-		t += 1
-		x_p = fw_step(A, b, x, eta=eta)
-		x = x_p
-		err = A * x - b
-		vals[t] = real(zeta^2) * sum(x .^ 2) + sum(err .^ 2) / n
-	# print(vals[t])
-	# sum(x)
-	end
-	print(t)
-end
-
-# ╔═╡ 62c5c163-45a6-4204-86ac-4d68cfd26eb1
-x
-
-# ╔═╡ bef90e71-e549-497f-93b2-eee2fe65ae95
-sparsify(lambda)
-
-# ╔═╡ bffc7a2d-1dee-453b-b31c-05c1b933c78c
-md"""
-# projected
-"""
-
-# ╔═╡ a831b2be-2146-4f7c-a76c-baa7c831acc6
-data = data_setup(quota(), :country, :year, :quota)
-
-# ╔═╡ 343f3bc4-6a58-4760-b296-37defceba0ae
-S_col1, T_col1, Y_col1 = :country, :year, :quota
-
-# ╔═╡ 27290483-fafa-4c69-80e0-479274fc062f
-covariates = [:lngdp]
-
-# ╔═╡ 3dc4428a-09d3-4347-b7ff-8fbc3cd8b97c
-begin
-	  k1 = size(covariates, 1)
-	  X = Matrix(data[:, covariates])
-	  y = data[:, Y_col1]
-end
-
-# ╔═╡ 30fbe9dd-4514-46da-900d-9577000c42c0
-X
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -659,28 +579,28 @@ version = "5.1.1+0"
 """
 
 # ╔═╡ Cell order:
-# ╠═6eaa6510-d0a7-11ed-34e6-615c7693e1e9
-# ╟─74103105-4068-40e1-801b-58889bad44ab
-# ╟─b070d585-1f28-4dd6-9c1f-f2c03465ea0a
-# ╟─0f7aff69-746b-4239-b5a9-86c36a2ea328
-# ╠═a8be5b99-8791-4404-9b15-b1216122e7ad
-# ╠═d428c86d-8ac4-499b-893b-dde3399a77af
-# ╠═81506d33-4873-4614-aca9-55339adb70b0
-# ╠═efffa1ab-178c-47ef-8be4-ebca67e322df
-# ╠═121ceeb6-784f-4969-934a-e59b84fbb0e8
-# ╠═d8ed2d49-6eb4-4ab8-a090-8c04172f3a5f
-# ╠═846044d4-442d-4995-a7fd-1dc8c134bed3
-# ╠═c868efdd-42aa-4523-8506-35ecef34a0c0
-# ╠═ffb0a86a-a46c-4dcc-97eb-2d9680bf04a9
-# ╠═c8e2a12a-c0cb-4f9a-b4ee-68e76cf9c4d3
-# ╠═bf39c951-3bf9-4bc5-8aa7-8a97ff8781ab
-# ╠═62c5c163-45a6-4204-86ac-4d68cfd26eb1
-# ╠═bef90e71-e549-497f-93b2-eee2fe65ae95
-# ╠═bffc7a2d-1dee-453b-b31c-05c1b933c78c
-# ╠═a831b2be-2146-4f7c-a76c-baa7c831acc6
-# ╠═343f3bc4-6a58-4760-b296-37defceba0ae
-# ╠═27290483-fafa-4c69-80e0-479274fc062f
-# ╠═3dc4428a-09d3-4347-b7ff-8fbc3cd8b97c
-# ╠═30fbe9dd-4514-46da-900d-9577000c42c0
+# ╠═ab80fef0-d25e-11ed-1985-f94fc7748511
+# ╟─f6417b5e-cdae-448c-a471-aa137013138b
+# ╟─29670cc2-cb14-44dd-a2f8-04b8fca792b8
+# ╠═7a50b044-9789-4bf2-ac55-fbcb54453cf9
+# ╠═439f3ae0-be72-4032-910e-a6bce3163458
+# ╠═aa9c80d9-59b4-415c-bc19-849bc45583cd
+# ╠═eb98e437-9cab-479d-a830-32157042ebf3
+# ╠═46735155-a58a-465e-be61-dff16d7b54b8
+# ╠═fd4a3c7f-6d1f-46c8-8114-07a328f62453
+# ╠═bb049657-5912-4bdc-82a6-8ba9331b40ef
+# ╠═b1c49fdf-0279-4195-9af2-ed4d8a010f82
+# ╠═9d4f2d87-4a03-4122-ba71-1461a08c9a6d
+# ╟─ee9d9b87-8e05-48b3-affc-21650ccd8f7b
+# ╠═ee34841e-2709-416f-94f1-c75c1d0a871e
+# ╠═d39aa8d6-1f89-43ad-b342-caf1ed45da77
+# ╠═64eebd0e-2fe7-4be5-a631-7025afcbe519
+# ╠═ff4edbf2-6d1a-4212-a6bd-fb9460720eb1
+# ╠═8be586aa-313f-4ac0-bebe-e85cb8869ff9
+# ╠═ec3cf44a-0b9b-45c2-94a3-a751bd0a48b9
+# ╠═1e9ab538-7730-41d5-8ebd-30a5dcbb6eae
+# ╟─60bf50ca-1eed-49de-b933-2b1c98135158
+# ╠═80820705-195b-4107-a5ec-0aad2dd1c0e7
+# ╠═52ca4744-7852-4b1f-8111-31fdf4a347a1
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
