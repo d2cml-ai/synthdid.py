@@ -69,6 +69,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 
 			lambda_est = lambda_opt["params"]
 			omega_est = omega_opt["params"]
+
 			
 
 			omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
@@ -91,12 +92,17 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 			omega_est = weigths["omega"]
 			beta_est = weigths["beta"]
 			beta_covariate.append(beta_est[0])
+
 			omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
 			lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
 
 			y_beta = Y - np.sum(np.multiply(X, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
 			tau_hat[i] = np.dot(omg, y_beta) @ lmd
 		
+
+		lambda_estimate.append(lambda_est)
+		omega_estimate.append(omega_est)
+		weights = {"lambda":lambda_estimate, "omega": omega_estimate}
 	tau_hat_wt = tau_hat_wt / T_total
 
 	att = round(np.dot(tau_hat, tau_hat_wt), 5) 
@@ -110,8 +116,14 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 			# "beta_covariate": beta_covariate
 		}
 	)
+	result = {
+		"att": att,
+		"att_info": att_info,
+		"weights": weights,
+		"data_ref": tdf, "break_points": ttime
+	}
 
-	return att, att_info
+	return result
 
 
 

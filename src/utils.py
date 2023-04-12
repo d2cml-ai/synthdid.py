@@ -3,7 +3,7 @@ from numpy.random import default_rng, poisson
 
 def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covariates = None): #-> data_prep
 	if len(np.unique(data[treatment])) != 2:
-		print("s")
+		print("Error")
 
 	data_ref = pd.DataFrame()
 	data_ref[["unit", "time", "outcome"]] = data[[unit, time, outcome]]
@@ -35,9 +35,9 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 	num_col = data_ref.select_dtypes(np.number).columns
 	data_ref = data_ref[num_col].fillna(0)
 	data_ref[unit] = units
-	data_ref = pd.concat([data_ref, other], axis = 1)
 	if covariates is not None:
-		data_ref[covariates] = data_ref[covariates].fillna(0)
+		data_ref = pd.concat([data_ref, other], axis = 1)
+		# data_ref[covariates] = data_ref[covariates].fillna(0)
 	data_ref = data_ref.sort_values(["treated", "time", "unit"])
 
 	return (data_ref, break_points)
@@ -53,4 +53,16 @@ def collapse_form(Y: np.ndarray, N0: int, T0: int) -> np.ndarray:
 	Yc = pd.concat([result_top, pd.DataFrame(result_bottom).T], axis=0)
 	return Yc
 
-# def projected(Y, )
+def sum_normalize(x):
+    if np.sum(x) != 0:
+        return x / np.sum(x)
+    else:
+        return np.full(len(x), 1/len(x))
+    
+def att_mult(Y_beta, omega, _lambda, N1, T1):
+    weights_omega = np.concatenate(([-omega], np.full(N1, 1/N1)))
+    weights_lambda = np.concatenate(([-_lambda], np.full(T1, 1/T1)))
+    return np.dot(weights_omega, Y_beta).dot(weights_lambda)
+    
+    # omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
+			# lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))

@@ -33,16 +33,22 @@ def sc_weight_fw(A, b, x=None, intercept=True, zeta=1, min_decrease=1e-3, max_it
         A = A - np.mean(A, axis=0)
         b = b - np.mean(b)
     t = 0
-    vals = np.zeros(max_iter)
+    # vals = np.zeros(max_iter)
+    vals = []
     eta = n * np.real(zeta ** 2)
     vals_iter = False
-    while (t < max_iter) and ((t < 1) or (vals[t - 1] - vals[t] > min_decrease ** 2)):
+    while (t < max_iter) and ((t < 2) or vals_iter):
+        t += 1
         x_p = fw_step(A, b, x, eta=eta)
         x = x_p.copy()
         err = np.dot(A, x) - b
-        vals[t] = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
-        t += 1
 
+        vals_t = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
+        vals = np.append(vals, vals_t)
+        nt = len(vals)
+
+        if nt > 1:
+            vals_iter = vals[nt - 2] - vals[nt - 1] > min_decrease ** 2
     return {"params": x, "vals": vals}
 
 
@@ -110,9 +116,9 @@ def sc_weight_covariates(
     t = 0
     y_beta = Y - np.sum(np.multiply(X_covariates, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
     weights = update_weights(y_beta, lambda_est, omega_est)
-    vals2 = True
+    vals_iter = False
     
-    while (t < max_iter) and ((t < 2) or vals2):
+    while (t < max_iter) and ((t < 2) or vals_iter):
 
         t = t + 1
         coef_grad_beta = []
@@ -123,7 +129,7 @@ def sc_weight_covariates(
             s_omega = np.dot(weights["err_omega"], x_cov[:, :T0].T) @ np.concatenate([weights["omega"], [-1]]) / T0
 
             coef_grad_beta.append(s_lambda + s_omega)
-        grad_beta = np.array(coef_grad_beta[0]) * -1
+        grad_beta = np.array(coef_grad_beta) * -1
         alpha = 1 / (t + 1)
         beta_est = beta_est - alpha * grad_beta
         y_beta = Y - np.sum(np.multiply(X_covariates, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
@@ -134,7 +140,7 @@ def sc_weight_covariates(
         tn = len(vals)
 
         if tn >= 2:
-            vals2 = vals[tn - 2] - vals[tn - 1] > min_decrease **2
+            vals_iter = vals[tn - 2] - vals[tn - 1] > min_decrease **2
 
     return {
         "lambda": weights["lambda"],
