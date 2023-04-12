@@ -37,7 +37,7 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 	data_ref[unit] = units
 	if covariates is not None:
 		data_ref = pd.concat([data_ref, other], axis = 1)
-		# data_ref[covariates] = data_ref[covariates].fillna(0)
+		# data_ref[covariates] = data_ref[covariates].fillna(0)s
 	data_ref = data_ref.sort_values(["treated", "time", "unit"])
 
 	return (data_ref, break_points)
