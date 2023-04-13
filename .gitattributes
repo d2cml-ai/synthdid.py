@@ -1,0 +1,6 @@
+*.html linguist-vendored
+*.ipynb linguist-vendored
+*.r linguist-vendored
+*.jl linguist-vendored
+*.ado linguist-vendored
+*.do linguist-vendored
