@@ -1,151 +1,142 @@
 import numpy as np, pandas as pd
+from utils import collapse_form
 
-def fw_step(A, b, x, eta, alpha=None):
-    x = np.array(x)
-    Ax = np.dot(A, x)
-    half_grad = np.dot((Ax - b), A) + eta * np.transpose(x)
-    i = np.argmin(half_grad)
-    if alpha is not None:
-        x *= (1 - alpha)
-        x[i] += alpha
+def contract3(X, v):
+    
+    assert (len(X.shape) == 3) and (X.shape[0] == len(v))
+    out = np.zeros(X.shape[1: ])
+    
+    if len(v) == 0: return out
+    
+    for ii in range(len(v)):
+        out += v[ii] * X[ii, :, :]
+    
+    return out
+
+def fw_step(A, x, b, eta, alpha = None): # x and b must be 2d np.array and columns
+    
+    Ax = A @ x
+    half_grad = (Ax - b).T @ A + (eta * x).T
+    i = half_grad.argmin()
+
+    if alpha != None:
+        x = x * (1 - alpha)
+        x[i] = x[i] + alpha
         return x
-    else:
-        d_x = x.copy() * -1
-        d_x[i] = 1 - x[i]
-        if np.all(d_x == 0):
-            return x
-        d_err = A[:, i] - Ax
-        step_upper = np.dot(-half_grad,  d_x)
-        step_bot = np.sum(d_err ** 2) + eta * np.sum(d_x ** 2)
-        step = step_upper / step_bot
-        constrained_step = np.min([1, np.max([0, step])])
-        return x + constrained_step * d_x
+    
+    d_x = -x; d_x[i] = 1 - x[i]
 
+    if all(d_x == 0): 
+        return x
+    
+    d_err = A[:, i: i + 1] - Ax
+    step = - (half_grad @ d_x)[0, 0] / ((d_err ** 2).sum() + eta * (d_x ** 2).sum())
+    constrained_step = min(1, max(0, step))
+    
+    return x + constrained_step * d_x
 
-# x -> lambda(r)
-def sc_weight_fw(A, b, x=None, intercept=True, zeta=1, min_decrease=1e-3, max_iter=1000):
-    A = np.array(A)
-    b = np.array(b)
-    n, k = A.shape
-    if x is None:
-        x = np.full(k, 1/k)
+def sc_weight_fw(
+        Y, 
+        zeta, 
+        intercept = True, 
+        lmbda = None, 
+        min_decrease = 1e-3, 
+        max_iter = 1000
+):
+    
+    T0 = Y.shape[1] - 1
+    N0 = Y.shape[0]
+
+    if lmbda == None:
+        lmbda = np.atleast_2d(np.repeat(1 / T0, T0)).T
+    
     if intercept:
-        A = A - np.mean(A, axis=0)
-        b = b - np.mean(b)
+        Y = Y - Y.mean(axis = 0)
+
     t = 0
-    # vals = np.zeros(max_iter)
-    vals = []
-    eta = n * np.real(zeta ** 2)
-    vals_iter = False
-    while (t < max_iter) and ((t < 2) or vals_iter):
+    vals = np.zeros(max_iter)
+    A = Y[:, :T0].copy()
+    b = Y[:, T0: T0 + 1].copy()
+    eta = N0 * np.real(zeta ** 2)
+
+    while (t < max_iter) and ((t < 2) or (vals[t - 2] - vals[t - 1] > min_decrease ** 2)):
+        lambda_p = fw_step(A, lmbda, b, eta) # make sure to np.atleast_2d lmbda (needs to be column)
+        lmbda = lambda_p
+        err = Y[: N0, :] @ np.append(lmbda, [[-1]], axis = 0)
+        vals[t] = np.real(zeta ** 2) * (lmbda ** 2).sum() + (err ** 2).sum() / N0
         t += 1
-        x_p = fw_step(A, b, x, eta=eta)
-        x = x_p.copy()
-        err = np.dot(A, x) - b
-
-        vals_t = np.real(zeta ** 2) * np.sum(x ** 2) + np.sum(err ** 2) / n
-        vals = np.append(vals, vals_t)
-        nt = len(vals)
-
-        if nt > 1:
-            vals_iter = vals[nt - 2] - vals[nt - 1] > min_decrease ** 2
-    return {"params": x, "vals": vals}
-
-
-def collapsed_form(Y, N0, T0):
-    N, T = Y.shape
-    Y = pd.DataFrame(Y)
-    row_mean = Y.iloc[0:N0, T0:T].mean(axis=1)
-    col_mean = Y.iloc[N0:N, 0:T0].mean(axis=0)
-    overall_mean = Y.iloc[N0:N, T0:T].mean().values[0]
-    result_top = pd.concat([Y.iloc[0:N0, 0:T0], row_mean], axis=1)
-    result_bottom = pd.concat([col_mean.T, pd.Series(overall_mean)], axis=0)
-    return pd.concat([result_top, pd.DataFrame(result_bottom).T], axis=0)
-
+    
+    return {"lambda": lmbda, "vals": vals}
 
 def sc_weight_covariates(
-    Y, X_covariates, lambda_est = None, omega_est = None, beta_est = None,
-    zeta_lambda=0, zeta_omega=0,
-    lambda_intercept=True, omega_intercept=True, 
-    max_iter=1000, min_decrease=1e-3,
-    update_lambda=True, update_omega=True):
-
-
-    N, T = Y.shape
-    N0, T0 = N - 1, T - 1
-
-    if lambda_est is None:
-        lambda_est = [1 / T0] * T0
-    if omega_est is None:
-        omega_est = [1 / N0] * N0
-    if beta_est is None:
-        beta_est = np.zeros(len(X_covariates))
+        Y, 
+        X = None, 
+        zeta_lambda = 0, 
+        zeta_omega = 0, 
+        lambda_intercept = True, 
+        omega_intercept = True, 
+        min_decrease = 1e-3, 
+        max_iter = 1000, 
+        lmbda = None, 
+        omega = None, 
+        beta = None, 
+        update_lambda = True, 
+        update_omega = True
+):
     
-    def update_weights(Y, lambda_estimation, omega_estimation):
+    if X == None: X = np.zeros((0, ) + Y.shape)
+    
+    assert ((len(Y.shape) == 2) and (len(X.shape) == 3) and (Y.shape == X.shape[1:]) and np.all(np.isfinite(X)) and np.all(np.isfinite(Y)))
+
+    T0 = Y.shape[1] - 1
+    N0 = Y.shape[0] - 1
+
+    if len(X.shape) == 2: X = X.reshape((1, ) + X.shape)
+    if lmbda == None: lmbda = np.atleast_2d(np.repeat(1 / T0, T0)).T
+    if omega == None: omega = np.atleast_2d(np.repeat(1 / N0, N0)).T
+    if beta == None: beta = np.zeros((X.shape[0], 1))
+
+    def update_weights(Y, lmbda, omega):
+
         if lambda_intercept:
-            Y_lambda = Y[:N0, :] - np.mean(Y[:N0, :], axis=0)
+            Y_lambda = Y[:N0, :].copy() - np.atleast_2d(Y[:N0, :].mean(axis = 1)).T
         else:
-            Y_lambda = Y[:N0, :]
-            
+            Y_lambda = Y[:N0, :].copy()
+        
+        if update_lambda: lmbda = fw_step(Y_lambda[:, :T0], lmbda, Y_lambda[:, T0: T0 + 1], N0 * np.real(zeta_lambda ** 2))
+
+        err_lambda = Y_lambda @ np.append(lmbda, [[-1]], axis = 0)
+        
         if omega_intercept:
-            Y_omega = Y[:, :T0].T - np.mean(Y[:, :T0].T, axis = 0)   
+            Y_omega = Y[:, :T0].T.copy() - np.atleast_2d(Y[:, :T0].T.mean(axis = 1)).T
         else:
-            Y_omega = Y[:, :T0].T
+            Y_omega = Y[:, :T0].T.copy()
         
-        if update_lambda:
-            lambda_ = fw_step(Y_lambda[:, 0:T0], Y_lambda[:, T0], lambda_estimation, eta=N0 * zeta_lambda ** 2)
-        if update_omega:
-            omega_ = fw_step(Y_omega[:, 0:N0], Y_omega[:, N0], omega_estimation, eta=T0 * zeta_omega ** 2)
-        
-        err_lambda = Y_lambda @ np.concatenate((lambda_, [-1]))
-        err_omega = Y_omega @ np.concatenate((omega_, [-1]))
-        
-        val = zeta_omega ** 2 * np.sum(omega_ ** 2) + zeta_lambda ** 2 * np.sum(lambda_ ** 2) + np.sum(err_omega ** 2) / T0 + np.sum(err_lambda ** 2) / N0
-        
-        return {
-            "val": val,
-            "lambda": lambda_,
-            "omega": omega_,
-            "err_lambda": err_lambda,
-            "err_omega": err_omega
-        }
+        if update_omega: omega = fw_step(Y_omega[:, :N0], omega, Y_omega[:, N0: N0 + 1], T0 * np.real(zeta_omega ** 2))
+
+        err_omega = Y_omega @ np.append(omega, [[-1]], axis = 0)
+
+        val = np.real(zeta_omega ** 2) * (omega ** 2).sum() + np.real(zeta_lambda ** 2) * (lmbda ** 2).sum() + (err_omega ** 2).sum() / T0 + (err_lambda ** 2).sum() / N0
+
+        return {"val": val, "lmbda": lmbda, "omega": omega, "err_lambda": err_lambda, "err_omega": err_omega}
     
-    # max_iter_1 = max_iter + 1
-    # vals = np.zeros(max_iter)
-    vals = np.array([])
+    vals = np.zeros(max_iter)
     t = 0
-    y_beta = Y - np.sum(np.multiply(X_covariates, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
-    weights = update_weights(y_beta, lambda_est, omega_est)
-    vals_iter = False
+    Y_beta = Y.copy() - contract3(X, beta)
+    weights = update_weights(Y_beta, lmbda, omega)
+
+    while (t < max_iter) and ((t < 2) or (vals[t - 2] - vals[t - 1] > min_decrease ** 2)):
+        
+        if X.shape[0] == 0: 
+            grad_beta = np.zeros((0, 0)) 
+        else:
+            grad_beta = weights["err_lambda"].T @ X[:, :N0, :] @ weights["lmbda"] / N0 + weights["err_omega"].T @ X[:, :, :T0] @ weights["omega"] / T0
+        
+        alpha = 1 / t
+        beta = beta - alpha * grad_beta
+        Y_beta = Y.copy() - contract3(X, beta)
+        weights = update_weights(Y_beta, weights["lmbda"], weights["omega"])
+        vals[t] = weights["val"]
+        t += 1
     
-    while (t < max_iter) and ((t < 2) or vals_iter):
-
-        t = t + 1
-        coef_grad_beta = []
-
-        for i, x_cov in enumerate(X_covariates):
-            
-            s_lambda = np.dot(weights["err_lambda"], x_cov[:N0, :]) @ np.concatenate([weights["lambda"], [-1]]) / N0
-            s_omega = np.dot(weights["err_omega"], x_cov[:, :T0].T) @ np.concatenate([weights["omega"], [-1]]) / T0
-
-            coef_grad_beta.append(s_lambda + s_omega)
-        grad_beta = np.array(coef_grad_beta) * -1
-        alpha = 1 / (t + 1)
-        beta_est = beta_est - alpha * grad_beta
-        y_beta = Y - np.sum(np.multiply(X_covariates, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
-        weights = update_weights(y_beta, weights["lambda"], weights["omega"])
-        # print(vals, weights["val"])
-        vals = np.append(vals, weights["val"])
-        # vals[t] = weights["val"]
-        tn = len(vals)
-
-        if tn >= 2:
-            vals_iter = vals[tn - 2] - vals[tn - 1] > min_decrease **2
-
-    return {
-        "lambda": weights["lambda"],
-        "omega": weights["omega"],
-        "beta": beta_est,
-        "vals": vals
-    }
-
+    return {"lmbda": weights["lmbda"], "omega": weights["omega"], "beta": beta, "vals": vals}

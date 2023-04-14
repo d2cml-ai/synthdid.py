@@ -1,7 +1,7 @@
 import numpy as np, pandas as pd
 from get_data import quota, california_prop99
-from utils import panel_matrices, collapse_form
-from solver import fw_step, sc_weight_fw, sc_weight_covariates
+from utils import panel_matrices, collapse_form, projected
+from solver import fw_step, sc_weight_fw, sc_weight_covariates, contract3
 
 
 def sparsify_function(v) -> np.array:
@@ -88,20 +88,24 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 				X_temp = collapse_form(X_i, N0, T0)
 				Xc.append(np.array(X_temp))
 				X.append(X_i)
-			weigths = sc_weight_covariates(
-      			 Yc, Xc, zeta_lambda = zeta_lambda, zeta_omega = zeta_omega, lambda_intercept = lambda_intercept, omega_intercept = omega_intercept, min_decrease = min_decrease, max_iter = max_iter, lambda_est = None, omega_est = None
+			X = np.array(X)
+			Xc = np.array(Xc)
+			weights = sc_weight_covariates(
+      			Yc, Xc, zeta_lambda = zeta_lambda, zeta_omega = zeta_omega, lambda_intercept = lambda_intercept,
+				omega_intercept = omega_intercept, min_decrease = min_decrease, max_iter = max_iter
           		)
-			lambda_est = weigths["lambda"]
-			omega_est = weigths["omega"]
-			beta_est = weigths["beta"]
+			lambda_est = weights["lmbda"]
+			omega_est = weights["omega"]
+			beta_est = weights["beta"]
 			beta_covariate.append(beta_est[0])
 
-			omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
-			lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
+			omg = np.atleast_2d(np.concatenate(([-omega_est, np.full(N1, 1/N1)])))
+			lmd = np.atleast_2d(np.concatenate(([-lambda_est, np.full(T1, 1/T1)])))
 
-			y_beta = Y - np.sum(np.multiply(X, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
+			X_beta = contract3(X, beta_est)
+			y_beta = Y - X_beta
 			Y_beta.append(y_beta)
-			tau_hat[i] = np.dot(omg, y_beta) @ lmd
+			tau_hat[i] = omg.T @ y_beta @ lmd
 		
 
 		lambda_estimate.append(lambda_est)
