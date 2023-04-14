@@ -28,6 +28,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 	N0s, T0s = [], []
 	N1s, T1s = [], []
 	beta_covariate = []
+	Y_beta, Y_units = [], []
 
 	lambda_estimate, omega_estimate = [], []
 
@@ -39,6 +40,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 		T_total += N1 * T1
 		tau_hat_wt[i] = N1 * T1 
 		Y = df_y.pivot_table(index="unit", columns="time", values="outcome", sort = False)
+		Y_units.append(Y.index)
 		N, T = Y.shape
 		N0, T0 = int(N - N1), int(T - T1)
 		N0s.append(N0)
@@ -76,6 +78,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 			lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
 
 			tau_hat[i] = np.dot(omg, Y) @ lmd
+			Y_beta.append(Y)
 		
 		if covariates is not None and cov_method == "optimized":
 			Yc = np.array(Yc)
@@ -97,12 +100,14 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 			lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
 
 			y_beta = Y - np.sum(np.multiply(X, beta_est[:, np.newaxis, np.newaxis]), axis = 0)
+			Y_beta.append(y_beta)
 			tau_hat[i] = np.dot(omg, y_beta) @ lmd
 		
 
 		lambda_estimate.append(lambda_est)
 		omega_estimate.append(omega_est)
 		weights = {"lambda":lambda_estimate, "omega": omega_estimate}
+
 	tau_hat_wt = tau_hat_wt / T_total
 
 	att = round(np.dot(tau_hat, tau_hat_wt), 5) 
@@ -120,7 +125,8 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 		"att": att,
 		"att_info": att_info,
 		"weights": weights,
-		"data_ref": tdf, "break_points": ttime
+		"data_ref": tdf, "break_points": ttime,
+		"Y_beta": Y_beta, "Y_units": Y_units
 	}
 
 	return result
