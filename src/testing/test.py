@@ -1,15 +1,19 @@
-import src.synthdid as sdid
-from src.get_data import fetch_CaliforniaSmoking
+import numpy as np
 
-df = fetch_CaliforniaSmoking()
+from src.synthdid import *
+from src.solver import *
+from src.utils import *
 
-PRE_TERM = [1970, 1988]
-POST_TERM = [1989, 2000]
+N = 30
+N0 = 1
+T = 25
+T0 = 12
 
-tau_hat_sdid = sdid.synthdid_estimate(df, PRE_TERM, POST_TERM, ["California"])
+N1 = N - N0
+T1 = T - T0
 
-tau_hat_sc = sdid.sc_estimate(df, PRE_TERM, POST_TERM, ["California"])
+beta = np.atleast_2d(np.array([0.3, 0, 0.7])).T
+omega = np.random.rand(N1, 1)
 
-sc_params = sdid.sc_params(df, PRE_TERM, POST_TERM, ["California"])
+omega = sparsify_function(omega)
 
-tau_hat_did = sdid.did_estimate(df, PRE_TERM, POST_TERM, ["California"])
