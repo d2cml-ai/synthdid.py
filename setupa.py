@@ -5,7 +5,7 @@ from setuptools import setup
 setup(
 	name="synthdidpy",
 	author="D2CML",
-	version="0.1.0",
+	version="0.1",
 	keywords='causal-inference',
     classifiers=[
         'Intended Audience :: Developers',
