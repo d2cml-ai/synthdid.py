@@ -1,4 +1,3 @@
-
 import pandas as pd
 import numpy as np
 from scipy.linalg import svd, eigh, norm
@@ -114,26 +113,6 @@ def simulate_dgp(parameters, N1, T1):
     Y = F + M + np.random.multivariate_normal(np.zeros(Sigma.shape[0]), Sigma, N)
     return {"Y":Y[np.argsort(assignment).tolist(), :], "N0":N0, "T0":T0}
 
-
-
-# x = np.arange(1,101)
-
-# K = 10
-# deg = 5
-
-# def lindsey_density_estimate(x,K,deg):
-
-#     x_min = np.min(x)
-#     x_max = np.max(x)
-#     range_x = x_max - x_min
-#     low_x = x_min - 0.2*range_x                                        # 20% step outside of range of x
-#     up_x = x_max + 0.2*range_x
-#     range_full = up_x- low_x
-#     splits = np.linspace(low_x,up_x,num = K+1)                          # split the range into K segments
-#     mesh_size = splits[1] - splits[0]
-#     centers = (splits[1:] +  np.delete(splits, (K)))/2
-#     counts = np.array(pd.value_counts(pd.cut(x, splits), sort = False)).tolist()     # counts the points in each segment
-#     scale = np.sum(counts)*mesh_size
 
 
 

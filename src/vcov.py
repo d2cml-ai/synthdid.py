@@ -1,9 +1,10 @@
 
 import itertools, pandas as pd, numpy as np
+from sdid import sdid
 
 
-def bootstrap_se(estimate, n_reps = 50):
-    data_ref = estimate["data_ref"]
+
+def bootstrap_se(data_ref, n_reps = 50):
     uniqueID = np.unique(data_ref.unit)
     N = len(uniqueID)
     def theta_bt():
@@ -27,8 +28,7 @@ def bootstrap_se(estimate, n_reps = 50):
     se_bootstrap = np.sqrt(1 / n_reps * np.sum((att_bt - np.sum(att_bt / n_reps)) ** 2))
     return se_bootstrap
 
-def placebo_se(estimate, n_reps=50):
-    data_ref = estimate["data_ref"]
+def placebo_se(data_ref, n_reps=50):
     tr_years = data_ref.query("time == tyear and tyear != 0").time
     N_tr = len(tr_years)
     df_co = data_ref.query("treated == 0")
@@ -64,11 +64,11 @@ def placebo_se(estimate, n_reps=50):
     se_placebo = np.sqrt(1 / n_reps * np.sum((att_pb - np.sum(att_pb / n_reps)) ** 2))
     return se_placebo
 
-def jackknife_se(estimate):
-    data_ref, time_break = estimate["data_ref"], estimate["break_points"]
+def jackknife_se(data_ref, time_break, weights, estimate):
+    # data_ref, time_break = estimate["data_ref"], estimate["break_points"]
     uniqID = np.unique(data_ref["unit"])
     N = len(uniqID)
-    weigths = estimate["weights"]
+    # weigths = estimate["weights"]
     lambda_estimate, omega_estimate = np.array(weigths["lambda"], dtype = object), np.array(weigths["omega"], dtype = object)
 
     def theta_jk(ind, _id):
@@ -106,3 +106,16 @@ def jackknife_se(estimate):
     att_aux = result.groupby("unit").sum().att_aux.to_numpy()
     se_jackknife = ((N-1)/N) * (N - 1) * varianza(att_aux)
     return se_jackknife
+
+class Variance:
+    def vcov(self, method="placebo", n_reps=50):
+        data_ref = self.data_ref
+        if method=="placebo":
+            se = placebo_se(data_ref, n_reps=50)
+        elif method=="bootstrap":
+            se = bootstrap_se(data_ref, n_reps=50)
+        else:
+            time_break, weights = self.ttime, self.weights
+            se = jackknife_se(data_ref, time_break, weights)
+        self.se = se
+        return self

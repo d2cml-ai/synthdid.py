@@ -1,5 +1,4 @@
 import pandas as pd, numpy as np
-from numpy.random import default_rng, poisson
 
 def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covariates = None): #-> data_prep
 	if len(np.unique(data[treatment])) != 2:
@@ -42,7 +41,7 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 
 	return (data_ref, break_points)
 
-def collapse_form(Y: np.ndarray, N0: int, T0: int) -> np.ndarray:
+def collapse_form(Y: np.ndarray, N0: int, T0: int):
 	N, T = Y.shape
 	Y = pd.DataFrame(Y)
 	row_mean = Y.iloc[0:N0, T0:T].mean(axis=1)
@@ -66,3 +65,13 @@ def att_mult(Y_beta, omega, _lambda, N1, T1):
     
     # omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
 			# lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
+
+
+def sparsify_function(v) -> np.array:
+	v = np.where(v <= np.max(v) / 4, 0, v)
+	return v / sum(v)
+
+def varianza(x):
+	n = len(x)
+	media = sum(x) / n
+	return sum((xi - media) ** 2 for xi in x) / (n - 1)
