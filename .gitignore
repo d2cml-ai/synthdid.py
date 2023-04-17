@@ -1,3 +1,4 @@
-src/__pycache__/
+synthdid/__pycache__
+synthdid.egg-info/
 *.csv
 dist*
