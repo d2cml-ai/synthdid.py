@@ -1,5 +1,17 @@
 import numpy as np, pandas as pd
 
+def contract3(X, v):
+    
+    assert (len(X.shape) == 3) and (X.shape[0] == len(v))
+    out = np.zeros(X.shape[1: ])
+    
+    if len(v) == 0: return out
+    
+    for ii in range(len(v)):
+        out += v[ii] * X[ii, :, :]
+    
+    return out
+    
 def fw_step(A, b, x, eta, alpha=None):
     x = np.array(x)
     Ax = np.dot(A, x)

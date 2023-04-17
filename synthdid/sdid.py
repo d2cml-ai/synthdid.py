@@ -1,5 +1,5 @@
 import numpy as np, pandas as pd
-from .utils import panel_matrices, collapse_form, varianza, sparsify_function
+from .utils import panel_matrices, collapse_form, varianza, sparsify_function, projected
 from .solver import fw_step, sc_weight_fw, sc_weight_covariates
 
 
@@ -131,7 +131,7 @@ class SDID:
 	# tdf, ttime = panel_matrices(data, unit, time, treatment, outcome, covariates)
 		tdf, ttime, covariates = self.data_ref, self.ttime, self.covariates
 		if (covariates is not None) and (cov_method == "projected"):
-			tdf, _, _ = projected(tdf)
+			tdf, _, _ = projected(tdf, 'outcome', 'unit', 'time', covariates)
 		
 		T_total = 0
 		break_points = len(ttime)
