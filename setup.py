@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 setup(
@@ -30,7 +30,7 @@ setup(
         "toml==0.10.0",
         "zipp==3.15.0",
     ],
-    name="synthdidpy",
+    name="synthdid",
     author="D2CML",
     version="0.1",
     packages=find_packages(),
@@ -43,7 +43,6 @@ setup(
         "Intended Audience :: Education",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: Apache Software License",
-        "Programming Language :: Python > 3.8",
         "Topic :: Scientific/Engineering",
     ],
 )

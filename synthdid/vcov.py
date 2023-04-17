@@ -1,6 +1,6 @@
 
 import itertools, pandas as pd, numpy as np
-from sdid import sdid
+from .sdid import sdid
 
 
 

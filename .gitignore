@@ -1,4 +1,16 @@
-synthdid/__pycache__
+synthdid/__pycache__/
+*.cpython-38.pyc
 synthdid.egg-info/
 *.csv
 dist*
+
+synthdid/__pycache__/sdid.cpython-38.pyc
+
+synthdid/__pycache__/__init__.cpython-38.pyc
+synthdid/__pycache__/get_data.cpython-38.pyc
+synthdid/__pycache__/plots.cpython-38.pyc
+synthdid/__pycache__/sdid.cpython-38.pyc
+synthdid/__pycache__/solver.cpython-38.pyc
+synthdid/__pycache__/synthdid.cpython-38.pyc
+synthdid/__pycache__/utils.cpython-38.pyc
+synthdid/__pycache__/vcov.cpython-38.pyc

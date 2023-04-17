@@ -4,6 +4,7 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 	if len(np.unique(data[treatment])) != 2:
 		print("Error")
 
+	data = data.reset_index()
 	data_ref = pd.DataFrame()
 	data_ref[["unit", "time", "outcome"]] = data[[unit, time, outcome]]
 	data_ref["treatment"] = data[treatment].to_numpy()
@@ -34,10 +35,14 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 	num_col = data_ref.select_dtypes(np.number).columns
 	data_ref = data_ref[num_col].fillna(0)
 	data_ref[unit] = units
-	if covariates is not None:
-		data_ref = pd.concat([data_ref, other], axis = 1)
-		# data_ref[covariates] = data_ref[covariates].fillna(0)s
 	data_ref = data_ref.sort_values(["treated", "time", "unit"])
+	if covariates is not None:
+		# return data
+		data_cov = data[covariates].loc[data_ref.index]
+		data_ref = pd.concat([data_ref, data_cov], axis = 1)
+		# data_ref[covariates] = data_ref[covariates].fillna(0)s
+		# return data_cov
+		return (data_ref, break_points)
 
 	return (data_ref, break_points)
 

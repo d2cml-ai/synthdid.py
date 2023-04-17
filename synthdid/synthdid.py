@@ -1,11 +1,11 @@
 import numpy as np, pandas as pd
 import itertools, matplotlib.pyplot as plt
 
-from utils import panel_matrices
-from get_data import quota
-from sdid import SDID
-from vcov import Variance
-from plots import Plots
+from synthdid.utils import panel_matrices
+from synthdid.get_data import quota
+from synthdid.sdid import SDID
+from synthdid.vcov import Variance
+from synthdid.plots import Plots
 
 class Synthdid(SDID, Variance, Plots):
 	def __init__(self, data, unit="unit", time = "time", treatment="treatment", outcome="outcome", covariates = None):
@@ -13,9 +13,7 @@ class Synthdid(SDID, Variance, Plots):
 		self.unit, self.time = unit, time
 		self.treatment, self.outcome = treatment, outcome
 		self.covariates = covariates
-		self.data_ref, self.ttime = panel_matrices(data, unit, time, treatment, outcome)
+		self.data_ref, self.ttime = panel_matrices(data, unit, time, treatment, outcome, covariates=covariates)
+		# if covariates is not None:
+		# 	self.data_cov = 
 
-
-# a.vcov()
-
-# dir(a)
