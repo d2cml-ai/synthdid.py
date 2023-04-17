@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
-from scipy.linalg import svd, eigh, norm
-import csv
-from urllib.request import urlopen
+from scipy.linalg import svd,  norm
 import statsmodels.api as sm
 import random
 

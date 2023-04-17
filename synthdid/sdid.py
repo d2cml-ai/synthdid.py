@@ -1,17 +1,8 @@
 import numpy as np, pandas as pd
-# from get_data import quota, california_prop99
-from utils import panel_matrices, collapse_form
+from utils import panel_matrices, collapse_form, varianza, sparsify_function
 from solver import fw_step, sc_weight_fw, sc_weight_covariates
 
 
-def sparsify_function(v) -> np.array:
-	v = np.where(v <= np.max(v) / 4, 0, v)
-	return v / sum(v)
-
-def varianza(x):
-	n = len(x)
-	media = sum(x) / n
-	return sum((xi - media) ** 2 for xi in x) / (n - 1)
 
 # scol => unit, tcol => time, ycol=> outcome, dcol => treatment
 # data_ref: treated => tunit
@@ -20,15 +11,15 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
          cov_method="optimized", noise_level=None, eta_omega=None, eta_lambda=1e-6, zeta_omega=None, zeta_lambda=None, omega_intercept=True, lambda_intercept=True, min_decrease=None, max_iter=10000, sparsify=sparsify_function, max_iter_pre_sparsify=100, lambda_estimate=None, omega_estimate=None
 		):
 	tdf, ttime = panel_matrices(data, unit, time, treatment, outcome, covariates)
+	beta_covariate = []
 	if (covariates is not None) and (cov_method == "projected"):
-		tdf = projected(tdf)
+		tdf, beta_covariates, _ = projected(tdf, outcome, unit, time, covariates)
 	
 	T_total = 0
 	break_points = len(ttime)
 	tau_hat, tau_hat_wt = np.zeros(break_points), np.zeros(break_points)
 	N0s, T0s = [], []
 	N1s, T1s = [], []
-	beta_covariate = []
 	Y_beta, Y_units = [], []
 
 	lambda_estimate, omega_estimate = [], []

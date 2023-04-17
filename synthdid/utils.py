@@ -41,6 +41,38 @@ def panel_matrices(data: pd.DataFrame(), unit, time, treatment, outcome, covaria
 
 	return (data_ref, break_points)
 
+def projected(data, outcome, unit, time, covariates):
+
+  k = len(covariates)
+  X = np.array(data[covariates])
+  y = np.atleast_2d(np.array(data[outcome])).T
+
+  # Pick non-treated
+  df_c = data[data.tyear == 0]
+
+  # One-hot encoding for time and unit
+  df_c = pd.concat([df_c, pd.get_dummies(df_c[[unit, time]], prefix_sep = "", prefix = "", columns = [unit, time], drop_first = True)], axis = 1)
+  o_h_cov = covariates + list(df_c[unit].unique()[1:]) + list(str(i) for i in df_c[time].unique()[1:])
+
+  # create X_c matrix with covariates, one-hot encoding. Create Y_c vector
+  y_c = np.atleast_2d(df_c[outcome].to_numpy()).T
+  X_c = df_c[o_h_cov].to_numpy()
+  X_c = np.c_[X_c, np.ones(X_c.shape[0])]
+
+  # OLS for Y_c on X_c, get beta
+  XX = np.dot(X_c.T, X_c)
+  Xy = np.dot(X_c.T, y_c)
+  all_beta = np.dot(np.linalg.inv(XX), Xy)
+  beta = all_beta[:k]
+
+  # Calculate adjusted Y
+  Y_adj = y - np.dot(X, beta)
+
+  # output projected data
+  data[outcome] = Y_adj
+
+  return (data, beta, X)
+
 def collapse_form(Y: np.ndarray, N0: int, T0: int):
 	N, T = Y.shape
 	Y = pd.DataFrame(Y)
@@ -63,10 +95,6 @@ def att_mult(Y_beta, omega, _lambda, N1, T1):
     weights_lambda = np.concatenate(([-_lambda], np.full(T1, 1/T1)))
     return np.dot(weights_omega, Y_beta).dot(weights_lambda)
     
-    # omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
-			# lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
-
-
 def sparsify_function(v) -> np.array:
 	v = np.where(v <= np.max(v) / 4, 0, v)
 	return v / sum(v)
