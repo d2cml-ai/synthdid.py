@@ -14,6 +14,7 @@ class Synthdid(SDID, Variance, Plots, Summary):
 		self.unit, self.time = unit, time
 		self.treatment, self.outcome = treatment, outcome
 		self.covariates = covariates
+		self.se = None
 		self.data_ref, self.ttime = panel_matrices(data, unit, time, treatment, outcome, covariates=covariates)
 		# if covariates is not None:
 		# 	self.data_cov = 
