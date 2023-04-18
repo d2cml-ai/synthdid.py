@@ -6,8 +6,9 @@ from synthdid.get_data import quota
 from synthdid.sdid import SDID
 from synthdid.vcov import Variance
 from synthdid.plots import Plots
+from synthdid.summary import Summary
 
-class Synthdid(SDID, Variance, Plots):
+class Synthdid(SDID, Variance, Plots, Summary):
 	def __init__(self, data, unit="unit", time = "time", treatment="treatment", outcome="outcome", covariates = None):
 		self.data = data
 		self.unit, self.time = unit, time

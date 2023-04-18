@@ -32,7 +32,7 @@ setup(
     ],
     name="synthdid",
     author="D2CML",
-    version="1.0",
+    version="0.9",
     packages=find_packages(),
     keywords="causal-inference",
     url="https://github.com/d2cml-ai/synthdid.py",
