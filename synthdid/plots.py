@@ -60,7 +60,7 @@ class Plots:
 
             # plots[f"t_{time}"] = fig
             plots.append(fig)
-
+        self.plot_outcomes = []
         self.plot_outcomes = plots
         return self
 
@@ -146,5 +146,6 @@ class Plots:
 
         for i, time in enumerate(times):
             plot_times(i)
+        self.plot_weights = []
         self.plot_weights = plots
         return self
