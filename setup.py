@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
 
+with open("Readme.md", "r", encoding="utf-8") as f:
+    long_description = f.read()
 
 setup(
     dependency_links=[],
@@ -31,9 +33,11 @@ setup(
         "zipp==3.15.0",
     ],
     name="synthdid",
-    author="D2CML",
-    version="0.9.2",
+    author="D2CML Team, Alexander Quispe, Rodrigo  Grijalba, Jhon Flores, Franco Caceres",
+    version="0.9.3",
     packages=find_packages(),
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     keywords="causal-inference",
     url="https://github.com/d2cml-ai/synthdid.py",
     license="MIT",
