@@ -112,27 +112,7 @@ california_estimate.summary().summary2
         text-align: right;
     }
 </style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>-15.6038</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+
 
 
 

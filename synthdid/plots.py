@@ -132,17 +132,17 @@ class Plots:
             fig, ax = plt.subplots()
 
             ax.scatter("unit", "difs", data = weights_dots, s = "size", c = "color", label = "")
-            # ax.scatter("unit", "difs", data = weights_dots, s = "size", color = "color", marker=shape_dot)
+            ax.set_xticks(range(len(units)))
             ax.set_xticklabels(units, rotation = 90, fontsize = ns);
             ax.set_xlabel("Group")
             ax.set_ylabel("Difference")
             ax.set_title("Adoption: " + str(time_title_cb(times[i])))
             ax.axhline(y=atts[i], linestyle = "--", color = "#E00029", lw = .6, label = f"Att {time_title_cb(times[i])}: {atts[i]}")
             ax.axhline(y=self.att, linestyle = "--", color = "#640257", lw = .8, label = f"Att: {spaces} {real_att}")
-            ax.legend(fontsize = 9)
+            ax.legend(fontsize = 9);
             if weights_dots.difs.max() > 0 and weights_dots.difs.min() < 0:
-                ax.axhline(y=0, lw = .5, c = "#0D3276")
-            plots.append(fig)
+                ax.axhline(y=0, lw = .5, c = "#0D3276");
+            plots.append(fig);
 
         for i, time in enumerate(times):
             plot_times(i)

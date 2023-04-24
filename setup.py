@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open("Readme.md", "r", encoding="utf-8") as f:
+with open("./Readme.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 setup(
@@ -34,7 +34,7 @@ setup(
     ],
     name="synthdid",
     author="D2CML Team, Alexander Quispe, Rodrigo  Grijalba, Jhon Flores, Franco Caceres",
-    version="0.9.3",
+    version="0.9.51",
     packages=find_packages(),
     long_description=long_description,
     long_description_content_type="text/markdown",
