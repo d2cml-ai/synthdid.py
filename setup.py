@@ -1,7 +1,11 @@
 from setuptools import setup, find_packages
 
-with open("./Readme.md", "r", encoding="utf-8") as f:
-    long_description = f.read()
+
+import urllib.request
+
+url = "https://raw.githubusercontent.com/d2cml-ai/synthdid.py/main/Readme.md"
+response = urllib.request.urlopen(url)
+long_description = response.read().decode("utf-8")
 
 setup(
     dependency_links=[],
@@ -34,7 +38,7 @@ setup(
     ],
     name="synthdid",
     author="D2CML Team, Alexander Quispe, Rodrigo  Grijalba, Jhon Flores, Franco Caceres",
-    version="0.9.51",
+    version="0.9.53",
     packages=find_packages(),
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -50,3 +54,4 @@ setup(
         "Topic :: Scientific/Engineering",
     ],
 )
+
