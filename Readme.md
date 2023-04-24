@@ -77,9 +77,9 @@ california_estimate.summary().summary2
     <tr>
       <th>0</th>
       <td>-15.6038</td>
-      <td>9.5733</td>
-      <td>-1.6299</td>
-      <td>0.1031</td>
+      <td>9.6862</td>
+      <td>-1.6109</td>
+      <td>0.1072</td>
     </tr>
   </tbody>
 </table>
@@ -112,11 +112,38 @@ california_estimate.summary().summary2
         text-align: right;
     }
 </style>
-
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>ATT</th>
+      <th>Std. Err.</th>
+      <th>t</th>
+      <th>P&gt;|t|</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>-15.6038</td>
+      <td>-</td>
+      <td>-</td>
+      <td>-</td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 
 
 #### Plots
+
+To avoid messages from matplotlib, a semicolon `;` should be added at the end of the function call.
+
+This way:
+
+- `estimate.plot_outcomes();`
+- `estimate.plot_weights();`
 
 
 ```python
@@ -131,23 +158,12 @@ california_estimate.plot_outcomes();
 
 
 ```python
-california_estimate.plot_weights()
+california_estimate.plot_weights();
 ```
 
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    
-
-
-
-
-    <synthdid.synthdid.Synthdid at 0x247c18bd340>
-
-
-
 
     
-![png](Readme_files/Readme_12_2.png)
+![png](Readme_files/Readme_12_0.png)
     
 
 
@@ -195,8 +211,8 @@ quota_estimate.vcov().summary().summary2 ## placebo
     <tr>
       <th>0</th>
       <td>8.0341</td>
-      <td>1.9112</td>
-      <td>4.2037</td>
+      <td>1.8566</td>
+      <td>4.3272</td>
       <td>0.0000</td>
     </tr>
   </tbody>
@@ -312,7 +328,7 @@ quota_cov_est.plot_outcomes()
 
 
 
-    <synthdid.synthdid.Synthdid at 0x247f469aeb0>
+    <synthdid.synthdid.Synthdid at 0x2313747f880>
 
 
 
@@ -363,27 +379,17 @@ quota_cov_est.plot_outcomes()
 quota_cov_est.plot_weights()
 ```
 
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
-    d:\work\synthdid.py\synthdid\plots.py:136: UserWarning: FixedFormatter should only be used together with FixedLocator
-      ax.set_xticklabels(units, rotation = 90, fontsize = ns);
+
+
+
+    <synthdid.synthdid.Synthdid at 0x2313747f880>
+
+
+
+
     
-
-
-
-
-    <synthdid.synthdid.Synthdid at 0x247f469aeb0>
-
+![png](Readme_files/Readme_21_1.png)
+    
 
 
 
@@ -419,11 +425,5 @@ quota_cov_est.plot_weights()
 
     
 ![png](Readme_files/Readme_21_7.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_8.png)
     
 
