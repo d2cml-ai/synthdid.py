@@ -1,7 +1,7 @@
 import matplotlib, matplotlib.pyplot as plt, numpy as np, pandas as pd
 
 class Plots:
-    def plot_outcomes(self, times = None, time_title_cb = int):
+    def plot_outcomes(self, times = None, time_title_cb = int, labels=None, wtplot=True, axlimit_zero=False):
         # matplotlib.use('Agg')
         sdid_weights = self.weights
         lambda_wg = sdid_weights["lambda"]
@@ -10,6 +10,8 @@ class Plots:
         N0s, T0s = table_result.N0, table_result.T0
         if times is None:
             times = table_result.time
+        if labels is None:
+            labels = ['Control','Treatment']
 
         Y_setups = self.Y_betas
         t_span = np.sort(np.unique(self.data_ref.time))
@@ -31,8 +33,8 @@ class Plots:
             plot_y_max = values_traj.max()
             plot_height = plot_y_max - plot_y_min
             base_plot = plot_y_min - plot_height / 5 
-
-            # plot_zero = 
+            if axlimit_zero:
+                base_plot = 0
 
             range_fill = pd.DataFrame(
                 {"line": lambda_hat * plot_height / 3 + base_plot, "time": t_span[:T0]}
@@ -46,13 +48,16 @@ class Plots:
             )
 
             fig, ax = plt.subplots()
-            ax.plot("time", "control", label="Control", data=trajectory, linestyle="--")
-            ax.plot("time", "treatment", label="Treatment", data=trajectory)
-            ax.legend()
-
+            ax.plot("time", "control", label=labels[0], data=trajectory, linestyle="--")
+            ax.plot("time", "treatment", label=labels[1], data=trajectory)
+            ax.legend(loc='upper right', fontsize=10, frameon=False)
+            if axlimit_zero:
+                ax.set_ylim(ymin=0)
+            
             if base_plot < 0 and plot_y_max > 0:
                 ax.axhline(y=0, color="grey", linestyle="--", lw=.8, alpha=.3)
-            ax.fill_between("time", base_plot, "line", data=range_fill, label="", alpha=0.7, color="#0D7F44")
+            if wtplot:
+                ax.fill_between("time", base_plot, "line", data=range_fill, label="", alpha=0.6, color="gray")
             ax.axvline(x=times[i], label="", color='k', linestyle="--", lw=.8)
 
             ax.set_xlabel("Time")
