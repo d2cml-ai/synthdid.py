@@ -8,7 +8,7 @@ from .solver import fw_step, sc_weight_fw, sc_weight_covariates
 # data_ref: treated => tunit
 
 def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None, 
-         cov_method="optimized", noise_level=None, eta_omega=None, eta_lambda=1e-6, zeta_omega=None, zeta_lambda=None, omega_intercept=True, lambda_intercept=True, min_decrease=None, max_iter=10000, sparsify=sparsify_function, max_iter_pre_sparsify=100, lambda_estimate=None, omega_estimate=None
+         cov_method="optimized", noise_level=None, eta_omega=None, eta_lambda=1e-6, zeta_omega=None, zeta_lambda=None, omega_intercept=True, lambda_intercept=True, min_decrease=None, max_iter=10000, sparsify=sparsify_function, max_iter_pre_sparsify=100, lambda_estimate=None, omega_estimate=None,synth=False,did=False
 		):
 	tdf, ttime = panel_matrices(data, unit, time, treatment, outcome, covariates)
 	beta_covariate = []
@@ -126,7 +126,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 
 class SDID:
 	def fit(self,# data: pd.DataFrame, unit, time, treatment, outcome, covariates=None, 
-			cov_method="optimized", noise_level=None, eta_omega=None, eta_lambda=1e-6, zeta_omega=None, zeta_lambda=None, omega_intercept=True, lambda_intercept=True, min_decrease=None, max_iter=10000, sparsify=sparsify_function, max_iter_pre_sparsify=100, lambda_estimate=None, omega_estimate=None
+			cov_method="optimized", noise_level=None, eta_omega=None, eta_lambda=1e-6, zeta_omega=None, zeta_lambda=None, omega_intercept=True, lambda_intercept=True, min_decrease=None, max_iter=10000, sparsify=sparsify_function, max_iter_pre_sparsify=100, lambda_estimate=None, omega_estimate=None,synth=False,did=False
 			):
 	# tdf, ttime = panel_matrices(data, unit, time, treatment, outcome, covariates)
 		tdf, ttime, covariates = self.data_ref, self.ttime, self.covariates
@@ -173,17 +173,27 @@ class SDID:
 			Al, bl = Yc.iloc[:N0, :T0], Yc.iloc[:N0, T0]
 			Ao, bo = Yc.T.iloc[:T0, :N0], Yc.T.iloc[:T0, N0]
 			if covariates is None or cov_method == "projected":
-				lambda_opt = sc_weight_fw(Al, bl, None, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
-				omega_opt = sc_weight_fw(Ao, bo, None, intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
+				if not synth and not did:
+					lambda_opt = sc_weight_fw(Al, bl, None, intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
+				if not did:
+					omega_opt = sc_weight_fw(Ao, bo, None, intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter_pre_sparsify)
 
 				if sparsify is not None:
-					lambda_opt = sc_weight_fw(Al, bl, sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)
-					omega_opt = sc_weight_fw(Ao, bo, sparsify(omega_opt["params"]), intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter)
+					if not synth and not did:
+						lambda_opt = sc_weight_fw(Al, bl, sparsify(lambda_opt["params"]), intercept=lambda_intercept, zeta=zeta_lambda, min_decrease=min_decrease, max_iter=max_iter)
+					if not did:
+						omega_opt = sc_weight_fw(Ao, bo, sparsify(omega_opt["params"]), intercept=omega_intercept, zeta=zeta_omega, min_decrease=min_decrease, max_iter=max_iter)
 
-				lambda_est = lambda_opt["params"]
-				omega_est = omega_opt["params"]
-
-				
+				if not synth and not did:
+					lambda_est = lambda_opt["params"]
+					omega_est = omega_opt["params"]				
+				if synth:
+					lambda_est = np.full(T0,1/T0)
+					omega_est = omega_opt["params"]				
+				if did:
+					lambda_est = np.full(T0,1/T0)
+					omega_est = np.full(N0,1/N0)
+                                        
 
 				omg = np.concatenate(([-omega_est, np.full(N1, 1/N1)]))
 				lmd = np.concatenate(([-lambda_est, np.full(T1, 1/T1)]))
@@ -237,11 +247,4 @@ class SDID:
 		self.Y_units = Y_units
 
 		return self
-
-
-
-
-
-
-  
 
