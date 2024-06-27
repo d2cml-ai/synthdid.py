@@ -1,6 +1,7 @@
 
 import itertools, pandas as pd, numpy as np
 from .sdid import sdid
+from .utils import sum_normalize, varianza
 
 
 
@@ -64,47 +65,57 @@ def placebo_se(data_ref, n_reps=50):
     se_placebo = np.sqrt(1 / n_reps * np.sum((att_pb - np.sum(att_pb / n_reps)) ** 2))
     return se_placebo
 
-def jackknife_se(data_ref, time_break, weights, estimate):
-    # data_ref, time_break = estimate["data_ref"], estimate["break_points"]
-    uniqID = np.unique(data_ref["unit"])
-    N = len(uniqID)
-    # weigths = estimate["weights"]
-    lambda_estimate, omega_estimate = np.array(weigths["lambda"], dtype = object), np.array(weigths["omega"], dtype = object)
+def jackknife_iteration(data, time_breaks, weights, unit_index: int) -> np.ndarray:
+    weighted_atts = np.array([])
+    total_treated_unit_periods = data[data.treatment == 1].shape[0]
 
-    def theta_jk(ind, _id):
-        omega_aux = sum_normalize(omega_estimate[_id])
-        if ind < len(omega_estimate):
-            omega_aux = sum_normalize(np.delete(omega_estimate[_id], ind))
-        lambda_aux = lambda_estimate[_id]
-        drop_unit, tyear_filter = uniqID[ind], [0, time_break[_id]]
+    for tyear_index, treatment_year in enumerate(time_breaks):
+        tyear_data = data[data.tyear.isin([0, treatment_year])]
+        N_treated = pd.unique(data[data.tyear == treatment_year].unit).shape[0]
+        tyear_omegas =  - weights["omega"][tyear_index]
+        N_control = tyear_omegas.shape[0]
+        tyear_omegas = np.concatenate([tyear_omegas, np.array([1/N_treated for _ in range(N_treated)])])
+        if unit_index < N_control:
+            tyear_omegas = np.delete(tyear_omegas, unit_index)
+        tyear_lambdas = - weights["lambda"][tyear_index]
+        T_post = pd.unique(tyear_data.time).shape[0] - tyear_lambdas.shape[0]
+        tyear_treated_unit_periods = N_treated * T_post
+        tyear_lambdas = np.concatenate([tyear_lambdas, np.array([1 / T_post for _ in range(T_post)])])
+        data_matrix = tyear_data.pivot_table(values = "outcome", index = "unit", columns = "time", sort = False).to_numpy() #type: ignore
+        att = tyear_omegas @ data_matrix @ tyear_lambdas.T
+        att_weight = tyear_treated_unit_periods / total_treated_unit_periods
+        weighted_atts = np.concatenate([weighted_atts, [att * att_weight]])
+    
+    jk_iteration_att = weighted_atts.sum()
+    return np.array([jk_iteration_att])
         
-        data_aux = data_ref.query("unit not in @drop_unit").query("tyear in @tyear_filter")
-        yng = data_aux.groupby('unit').size().shape[0]
-        ynt = data_aux.groupby('unit').size().min()
-        N1 = int((data_aux['tyear'] == time_break[_id]).sum() / ynt)
-        npre = data_aux[data_aux['time'] < time_break[_id]].groupby('time').size().shape[0]
-        T1 = int(ynt - npre)
-        tau_wt_aux = N1 * T1
 
-        Y = data_aux.pivot_table(index="unit", columns="time", values="outcome", sort=False)
-        Y_beta = np.array(Y)
-        nt = Y.shape
-        N1, T1 = int(nt[0] - len(omega_aux)), int(nt[1] - len(lambda_aux))
-        weights_omega = np.concatenate((-omega_aux, np.full(N1, 1/N1)))
-        weights_lambda = np.concatenate((-lambda_aux, np.full(T1, 1/T1)))
-        tau_aux = np.dot(weights_omega, Y).dot(weights_lambda)
-        return tau_aux
-    att_table = pd.concat([theta_jk(i, j) for i, j in itertools.product(range(N), range(len(time_break)))], ignore_index=True)
-    result = att_table.groupby('unit', group_keys=True)\
-    .apply(
-        lambda x: x.assign(
-            tau_wt=x['tau_wt_aux'] / x['tau_wt_aux'].sum(),
-            # att_aux= (x['tau_aux'] * (x['tau_wt_aux'] / x['tau_wt_aux'].sum())).sum()
-            att_aux=x['tau_aux'] * (x['tau_wt_aux'] / x['tau_wt_aux'].sum())
-            )
-        ).reset_index(drop=True)
-    att_aux = result.groupby("unit").sum().att_aux.to_numpy()
-    se_jackknife = ((N-1)/N) * (N - 1) * varianza(att_aux)
+
+def jackknife_se(data_ref: pd.DataFrame, time_breaks, att, weights):
+    
+    for tyear in time_breaks:
+        if pd.unique(data_ref[data_ref.tyear == tyear].unit).shape[0] == 1:
+            raise ValueError(f"Each adoption year must have more than one treated unit. Year {tyear} does not comply")
+    
+    unique_units = pd.unique(data_ref.unit.unique())
+    jackknife_ates = np.array([])
+
+    for unit_index, unit in enumerate(unique_units):
+        iteration_ate = jackknife_iteration(
+            data_ref[data_ref.unit != unit],
+            time_breaks,
+            weights,
+            unit_index
+        )
+        jackknife_ates = np.concatenate([
+            jackknife_ates,
+            iteration_ate
+        ])
+    
+    total_units = unique_units.shape[0]
+    var_jackknife = (total_units - 1) / total_units * ((jackknife_ates - att) ** 2).sum()
+    se_jackknife = np.sqrt(var_jackknife)
+
     return se_jackknife
 
 class Variance:
@@ -116,6 +127,6 @@ class Variance:
             se = bootstrap_se(data_ref, n_reps=50)
         else:
             time_break, weights = self.ttime, self.weights
-            se = jackknife_se(data_ref, time_break, weights)
+            se = jackknife_se(data_ref, time_break, self.att, weights)
         self.se = se
         return self

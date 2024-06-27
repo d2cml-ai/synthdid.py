@@ -98,7 +98,7 @@ def sdid(data: pd.DataFrame, unit, time, treatment, outcome, covariates=None,
 
 		lambda_estimate.append(lambda_est)
 		omega_estimate.append(omega_est)
-		weights = {"lambda":lambda_estimate, "omega": omega_estimate}
+	weights = {"lambda":lambda_estimate, "omega": omega_estimate}
 
 	tau_hat_wt = tau_hat_wt / T_total
 
@@ -227,7 +227,7 @@ class SDID:
 
 			lambda_estimate.append(lambda_est)
 			omega_estimate.append(omega_est)
-			weights = {"lambda":lambda_estimate, "omega": omega_estimate}
+		weights = {"lambda":lambda_estimate, "omega": omega_estimate}
 
 		tau_hat_wt = tau_hat_wt / T_total
 

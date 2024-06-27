@@ -38,7 +38,7 @@ setup(
     ],
     name="synthdid",
     author="D2CML Team, Alexander Quispe, Rodrigo  Grijalba, Jhon Flores, Franco Caceres",
-    version="0.9.53",
+    version="0.10.1",
     packages=find_packages(),
     long_description=long_description,
     long_description_content_type="text/markdown",
