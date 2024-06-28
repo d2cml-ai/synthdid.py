@@ -12,7 +12,7 @@ pip install synthdid
 
 ## Usage
 
-### Class input `Synthdid`
+### Input class `Synthdid`
 
 - `outcome`: Outcome variable (numeric)
 - `unit`: Unit variable (numeric or string)
@@ -21,409 +21,137 @@ pip install synthdid
 
 ### Methods:
 
-- `.fit(cov_method = ["optimized", "projected"])`
-- `.vcov(method = ["placebo", "bootstrap", "jackknife"], n_reps:int = 50)`
+- `.fit(cov_method: Literal["optimized", "projected"] | None)`: Estimates the ATE, as well as the time and unit weights. Can use covariates and fit them with the method specified in `cov_method`
+- `.vcov(method: Literal["placebo", "bootstrap", "jackknife"], n_reps:int = 50)`: Estimates the standard error of the ATE estimator
 
-## Example
+## Examples Based on Empirical Application
 
-### California 
+```python
+from synthdid.get_data import california_prop99, quota
+from synthdid.synthdid import Synthdid
+from matplotlib import pyplot as plt
+import numpy as np
+```
+
+### Block Design
+
+```python
+df = california_prop99()
+california_sdid = Synthdid(df, "State", "Year", "treated", "PacksPerCapita").fit().vcov().summary()
+california_sdid.summary2
+```
+
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|-15.60383|10.789924|-1.446148|0.148136|
+
+```python
+plt.show(california_sdid.plot_outcomes())
+plt.show(california_sdid.plot_weights())
+```
+
+![Estimated Trends SDID Prop. 99](readme/california_sdid_trends.png)
+
+![Estimated Weights SDID Prop. 99](readme/california_sdid_weights.png)
 
 
 ```python
-import matplotlib.pyplot as plt
-import numpy as np, pandas as pd
-
-from synthdid.synthdid import Synthdid as sdid
-from synthdid.get_data import quota, california_prop99
-pd.options.display.float_format = '{:.4f}'.format
+california_did = Synthdid(df, "State", "Year", "treated", "PacksPerCapita").fit(synth = True)
+plt.show(california_sc.plot_outcomes())
+plt.show(california_sc.plot_weights())
 ```
 
-Estimations with Standard Variance-Covariance Estimation
+![Estimated Trends SC Prop. 99](readme/california_sc_trends.png)
 
+![Estimated Weights SC Prop. 99](readme/california_sc_weights.png)
 
 ```python
-california_estimate = sdid(california_prop99(), unit="State", time="Year", treatment="treated", outcome="PacksPerCapita").fit().vcov(method='placebo')
-california_estimate.summary().summary2
+california_did = Synthdid(df, "State", "Year", "treated", "PacksPerCapita").fit(did = True)
+plt.show(california_did.plot_outcomes())
+plt.show(california_did.plot_weights())
 ```
 
+![Estimated Trends DiD Prop. 99](readme/california_did_trends.png)
 
+![Estimated Weights DiD Prop. 99](readme/california_did_weights.png)
 
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>-15.6038</td>
-      <td>9.6862</td>
-      <td>-1.6109</td>
-      <td>0.1072</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-Estimations without Standard Variance-Covariance Estimation
-
+### Staggered Adoptions Design
 
 ```python
-california_estimate = sdid(california_prop99(), "State", "Year", "treated", "PacksPerCapita").fit()
-california_estimate.summary().summary2
+df = quota()
+fit_model = Synthdid(df, "country", "year", "quota", "womparl").fit().vcov().summary()
+fit_model.summary2
 ```
 
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>-15.6038</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-#### Plots
-
-To avoid messages from matplotlib, a semicolon `;` should be added at the end of the function call.
-
-This way:
-
-- `estimate.plot_outcomes();`
-- `estimate.plot_weights();`
-
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|8.0341   |1.684382 |4.769762 |0.000002|
 
 ```python
-california_estimate.plot_outcomes();
+fit_model.att_info
 ```
 
-
-    
-![png](Readme_files/Readme_11_0.png)
-    
-
-
+| |time  |att_time |att_wt  |N0 |T0|N1|T1|
+|-|------|---------|--------|---|--|--|--|
+|0|2000.0|8.388868 |0.170213|110|10|1 |16|
+|1|2002.0|6.967746 |0.297872|110|12|2 |14|
+|2|2003.0|13.952256|0.276596|110|13|2 |13|
+|3|2005.0|-3.450543|0.117021|110|15|1 |11|
+|4|2010.0|2.749035 |0.063830|110|20|1 |6 |
+|5|2012.0|21.762715|0.042553|110|22|1 |4 |
+|6|2013.0|-0.820324|0.031915|110|23|1 |3 |
 
 ```python
-california_estimate.plot_weights();
+fit_covar_model = Synthdid(df[~df.lngdp.isnull()], "country", "year", "quota", "womparl", covariates = ["lngdp"]).fit().vcov(method = "bootstrap").summary()
+fit_covar_model.summary2
 ```
 
-
-    
-![png](Readme_files/Readme_12_0.png)
-    
-
-
-## Quota
-
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|8.04901  |3.395295 |2.370636 |0.017757|
 
 ```python
-quota_estimate = sdid(quota(), "country", "year", "quota", "womparl").fit()
-
+fit_covar_model_projected = Synthdid(df[~df.lngdp.isnull()], "country", "year", "quota", "womparl", covariates = ["lngdp"]).fit(cov_method = "projected").vcov(method = "bootstrap").summary()
+fit_covar_model_projected.summary2
 ```
 
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|8.05903  |3.428897 |2.350327 |0.018757|
+
+### Inference Options
 
 ```python
-quota_estimate.vcov().summary().summary2 ## placebo 
+countries_for_excluding = ["Algeria", "Kenya", "Samoa", "Swaziland", "Tanzania"]
+se_examples = Synthdid(
+        df[~df.country.isin(countries_for_excluding)],
+        "country",
+        "year",
+        "quota",
+        "womparl"
+).fit().vcov(method = "bootstrap").summary()
+se_examples.summary2
 ```
 
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>8.0341</td>
-      <td>1.8566</td>
-      <td>4.3272</td>
-      <td>0.0000</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-#### With covariates
-
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|10.33066 |5.404923 |1.911343 |0.055961|
 
 ```python
-
-quota_cov = quota().dropna(subset="lngdp")
-quota_cov_est = sdid(quota_cov, "country", 'year', 'quota', 'womparl', covariates=['lngdp']).fit()
-quota_cov_est.summary().summary2
+se_examples.vcov(method = "placebo").summary()
+se_examples.summary2
 ```
 
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>8.0490</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-Covariable method = 'projected'
-
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|10.33066 |2.244618 |4.602413 |0.000004|
 
 ```python
-quota_cov_est.fit(cov_method="projected").summary().summary2
+se_examples.vcov(method = "jackknife").summary()
+se_examples.summary2
 ```
 
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>ATT</th>
-      <th>Std. Err.</th>
-      <th>t</th>
-      <th>P&gt;|t|</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>8.0590</td>
-      <td>-</td>
-      <td>-</td>
-      <td>-</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```python
-quota_cov_est.plot_outcomes()
-```
-
-
-
-
-    <synthdid.synthdid.Synthdid at 0x2313747f880>
-
-
-
-
-    
-![png](Readme_files/Readme_20_1.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_2.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_3.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_4.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_5.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_6.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_20_7.png)
-    
-
-
-
-```python
-quota_cov_est.plot_weights()
-```
-
-
-
-
-    <synthdid.synthdid.Synthdid at 0x2313747f880>
-
-
-
-
-    
-![png](Readme_files/Readme_21_1.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_2.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_3.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_4.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_5.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_6.png)
-    
-
-
-
-    
-![png](Readme_files/Readme_21_7.png)
-    
+| |ATT      |Std. Err.|t        |P > \|t\|
+|-|---------|---------|---------|--------|
+|0|10.33066 |6.04213  |1.709771 |0.087308|
 
