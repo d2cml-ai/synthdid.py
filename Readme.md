@@ -1,13 +1,44 @@
-# sythdid: Synthetic Difference in Difference Estimation
+# synthdid: Synthetic Difference in Difference Estimation
 
 This package implements the synthetic difference-in-differences estimation procedure, along with a range of inference and graphing procedures, following the work of the author. The package draws on [R](https://github.com/synth-inference/synthdid) and [Julia](https://github.com/d2cml-ai/Synthdid.jl) code for optimization and [Stata](https://github.com/Daniel-Pailanir/sdid) code for implementation in contexts with staggered adoption over multiple treatment periods (as well as in a single adoption period as in the original code). The package extends the functionality of the original code, allowing for estimation in a wider range of contexts. Overall, this package provides a comprehensive toolkit for researchers interested in using the synthetic difference-in-differences estimator in their work.
 
+## Requirements
 
+- **Python 3.13+** (updated from 3.8 to support latest dependencies)
+- **NumPy 2.3.0+** (major version upgrade for improved performance)
+- **Pandas 2.3.0+** (latest version with enhanced functionality)
+- **Matplotlib 3.10.3+** (updated plotting capabilities)
+- **SciPy 1.15.3+** (latest scientific computing features)
+- **Statsmodels 0.14.4+** (updated statistical modeling)
 
-## Instalation
+## Installation
 
-```py
+### Using pip (PyPI)
+```bash
 pip install synthdid
+```
+
+### Using uv (recommended for development)
+```bash
+# Install with Python 3.13
+uv venv --python 3.13
+uv pip install -r requirements.txt
+```
+
+### Development Installation
+```bash
+# Clone the repository
+git clone https://github.com/workhelix/synthdid.py.git
+cd synthdid.py
+
+# Create virtual environment with Python 3.13
+uv venv --python 3.13
+
+# Install dependencies
+uv pip install -r requirements.txt
+
+# Install in development mode
+uv pip install -e .
 ```
 
 ## Usage
